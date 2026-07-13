@@ -1,1 +1,22 @@
 @import "tailwindcss";
+
+/* Header background decoration: slow wind-turbine rotation + a scrolling
+   wave strip, both far too slow/subtle for Tailwind's default animate-spin
+   (built for loading spinners, not background texture). */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 9s linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes wave-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-wave-scroll {
+  animation: wave-scroll 14s linear infinite;
+}

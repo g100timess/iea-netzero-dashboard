@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, FileJson, AlertCircle, ChevronLeft, ChevronRight, Database, FileText, Info, CheckCircle2, Download, Sparkles, X, Loader2, KeyRound, Eye, EyeOff, RotateCcw, Copy, ExternalLink, ChevronDown } from 'lucide-react';
+import { Search, FileJson, AlertCircle, ChevronLeft, ChevronRight, Database, FileText, Info, CheckCircle2, Download, Sparkles, X, Loader2, KeyRound, Eye, EyeOff, RotateCcw, Copy, ExternalLink, ChevronDown, Globe } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } from 'docx';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
@@ -117,6 +117,303 @@ function trlStageLabel(stage, uiLang) {
   return idx >= 0 ? TRL_STAGE_LABELS_EN[idx] : stage;
 }
 
+// Compact "TRL X-X" form (no 原型研發/技術示範/... prefix) for the one-line
+// sector summary sentence under the donut chart — same 4 buckets/order as
+// TRL_STAGE_LABELS above, just terser wording for an inline sentence.
+const TRL_COMPACT_LABELS_ZH = ['TRL 1-3', 'TRL 4-6', 'TRL 7-8', 'TRL 9+'];
+
+// One-line, hand-written definitions for every sector_zh value in the
+// cached dataset (132 total) — keyed by the exact sector_zh string. Used
+// only to add a short "what is this" clause to the sector summary sentence
+// when a donut segment is locked; not proofread by a domain expert, so
+// treat as a first pass and flag anything that reads wrong. English mode
+// intentionally has no equivalent map yet (skips the clause rather than
+// guessing a translation) — the definitions were reviewed in Chinese only.
+const SECTOR_DEFINITIONS = {
+  '其他生產技術': '未歸類於其他分類的生產製程技術',
+  '能源轉換與電氣化': '以電力或替代能源取代化石燃料的製程轉換',
+  '牆面、屋頂與立面': '應用於建築外殼（牆面、屋頂、立面）的節能技術',
+  '燃燒與轉化': '燃料燃燒或轉化為其他能源形式的製程',
+  '生質柴油與生質航煤': '以生質原料製造的柴油與航空燃料',
+  '回收': '材料或產品的回收再利用技術',
+  '電力加熱': '以電力做為熱源的加熱技術',
+  '支援CCUS': '設計上支援碳捕捉、利用與封存的技術',
+  '碳捕捉應用': '製程中附加碳捕捉功能的技術',
+  '燃料式加熱': '以燃料燃燒做為熱源的加熱技術',
+  '加工': '原料轉換為中間產品的加工製程',
+  '建築能源管理系統': '監控並優化建築能源使用效率的系統',
+  '甲烷排放監測與減排': '偵測並降低甲烷洩漏排放的技術',
+  '生質甲烷': '以生質原料製造、可替代天然氣的甲烷燃料',
+  '光伏': '太陽能板直接把光轉換成電的技術',
+  '直接還原鐵': '不經高爐、直接以氫氣或天然氣還原鐵礦的煉鐵製程',
+  '電動車': '以電池或電動馬達驅動的車輛',
+  '其他零組件': '未歸類於其他分類的零組件技術',
+  '磁性約束核融合': '利用磁場侷限電漿以達成核融合反應的技術',
+  '潛熱（相變材料）': '利用材料相變（如固轉液）吸放熱的儲熱技術',
+  '容量管理': '調節電網或系統供需容量的管理技術',
+  '其他熱泵技術': '未歸類於其他分類的熱泵技術',
+  '鋰基電池': '以鋰離子為主要儲能介質的電池技術',
+  '空氣源熱泵': '從空氣中擷取熱能來加熱或冷卻的熱泵',
+  '鐵路': '鐵路運輸相關的淨零技術',
+  '海洋能': '利用海洋潮汐、波浪、溫差等能量發電的技術',
+  '鑽井': '鑽探地下資源（如地熱、油氣）的工程技術',
+  '小型模組化反應爐': '模組化生產、規模較小的新型核反應爐',
+  '氫氣輸配': '將氫氣輸送與配送至用戶端的基礎設施',
+  '區域供熱熱儲存': '區域供熱系統中儲存並調度熱能的技術',
+  '機械儲能': '以機械方式（如抽蓄水力、飛輪）儲存能量的技術',
+  '建築層級熱儲存': '在單一建築內儲存熱能的技術',
+  '控制系統與監測': '監測與自動控制能源系統運作的技術',
+  '濕法冶金': '以水溶液化學方式提煉金屬的製程',
+  '高值化學品': '石化業中附加價值較高的化學品產製',
+  '甲醇': '以再生能源或替代原料製造的甲醇燃料',
+  '碳捕捉再利用': '捕捉二氧化碳後再利用製成其他產品的技術',
+  '照明技術與控制系統': '節能照明設備與其控制系統',
+  '減少材料損耗': '降低生產過程中材料浪費的技術',
+  '固態設備冷卻': '以固態元件（無傳統冷媒循環）進行設備冷卻的技術',
+  '飛機': '航空器本身的淨零相關技術',
+  '零組件': '設備或系統的組成零件技術',
+  '其他電池技術': '未歸類於其他分類的電池技術',
+  '氫燃料電池電動車（FCEV）': '以氫燃料電池發電驅動的電動車',
+  '先進燃燒引擎與動力系統': '效率提升或排放降低的新型燃燒引擎與傳動系統',
+  '風力': '利用風力發電的技術',
+  '生質乙醇': '以生質原料發酵製成的乙醇燃料',
+  '地熱能地面作業': '地熱發電廠地面端的設備與作業技術',
+  '地下儲存': '利用地下空間（如鹽穴、含水層）儲存氣體或能源的技術',
+  '氫氣直接使用': '氫氣不經轉換、直接做為燃料使用的應用',
+  '熱裂解': '在無氧或低氧環境下以高溫分解原料的製程',
+  '電化學儲能': '以電池等電化學方式儲存電能的技術',
+  '電纜回收': '廢棄電纜的材料回收技術',
+  '製造': '產品製造相關的淨零技術',
+  '替代路徑': '傳統製程之外的替代生產路徑',
+  '熱觸媒': '以熱能驅動、搭配觸媒進行化學反應的製程',
+  '回收（廢棄物轉化為化學品與生質能）': '將廢棄物轉化為化學品或生質能的回收技術',
+  '門窗': '建築門窗的節能設計與技術',
+  '熱驅動熱泵': '以熱能（而非電力）驅動的熱泵技術',
+  '氫能飛機零組件': '以氫能驅動的飛機零組件技術',
+  '氫燃料車輛': '以氫氣為燃料的車輛',
+  '充電與加注': '電動或氫能車輛的充電、加氣基礎設施',
+  '煉製、運輸與儲存': '燃料的煉製、運輸與儲存相關技術',
+  '太陽能熱': '利用鏡面或集熱器把太陽能轉換成熱能的技術',
+  '燃料循環前端': '核燃料循環中，鈾礦開採至製成燃料棒前的階段',
+  '替代方案': '傳統技術之外的替代解決方案',
+  '液態燃料': '以液態形式儲存與使用的替代燃料',
+  '調理製程': '產品或原料前處理、調整性質的製程',
+  '氫基燃料應用': '以氫氣為基礎製成的燃料（如氨、合成燃料）之應用',
+  '電解槽設計': '以電解水製氫的設備設計技術',
+  '其他': '未歸類於其他分類的技術',
+  '電纜與導體': '電力傳輸用的電纜與導體技術',
+  '其他儲存技術': '未歸類於其他分類的能源儲存技術',
+  '前處理與拆解': '回收物料的前置處理與拆解技術',
+  '生質燃料': '以生質原料製成的替代燃料',
+  '其他能源': '未歸類於其他分類的能源來源',
+  '建築設計工具': '協助建築節能設計的軟體或工具',
+  '輕量化': '降低產品或載具重量以提升能源效率的技術',
+  '牆面、屋頂與立面太陽能熱技術': '整合於建築外殼的太陽能熱技術',
+  '空調機': '建築空間冷氣/空調設備',
+  '蒸發冷卻': '利用水分蒸發帶走熱量的冷卻技術',
+  '地源與水源熱泵': '從地下或水體擷取熱能的熱泵技術',
+  '其他建築冷暖技術': '未歸類於其他分類的建築冷暖技術',
+  '多聯供系統': '同時產出電力、熱能等多種能源產物的系統',
+  '次世代金屬電池': '鋰離子之外、新型態的金屬電池技術',
+  '電動車充電設備': '電動車專用的充電設備',
+  '加氣與基礎設施': '氫能或替代燃料車輛的加氣基礎設施',
+  '引擎': '動力來源的引擎技術',
+  '船舶運營': '船舶航行與營運相關的減碳技術',
+  '搭配二氧化碳捕捉': '製程中附加二氧化碳捕捉功能的技術',
+  '次世代地熱能源系統': '突破傳統地質限制的新型地熱發電技術',
+  '大型反應爐': '傳統規模的大型核反應爐',
+  '核融合': '使原子核融合釋放能量的發電技術',
+  '慣性約束核融合': '以雷射等方式瞬間壓縮燃料以達成核融合的技術',
+  '合成燃料生產': '以氫氣與二氧化碳等原料合成的人造燃料',
+  '地上儲存': '地面設施的能源或氣體儲存技術',
+  '氫氣海運': '以船舶運輸氫氣（或其衍生物）的技術',
+  '地質氫': '自然存在於地層中、可開採的氫氣資源',
+  '潛熱儲存': '利用材料相變儲存熱能的技術',
+  '顯熱儲存': '以物質溫度變化（不改變相態）儲存熱能的技術',
+  '熱化學儲熱': '利用可逆化學反應儲存與釋放熱能的技術',
+  '轉換與變流': '電力形式轉換（如交直流轉換）的技術',
+  '直接空氣捕捉': '直接從大氣中捕捉二氧化碳的技術',
+  '礦物儲存': '將二氧化碳固化封存於礦物中的技術',
+  '二氧化碳運輸': '捕捉後的二氧化碳輸送至封存地點的技術',
+  '採礦與萃取': '原物料的開採與萃取技術',
+  '生物技術': '以生物程序（如微生物、酵素）進行轉化的技術',
+  '苯、甲苯與二甲苯': '石化業重要中間原料（BTX）之生產技術',
+  '乙烯': '石化業基礎原料乙烯的生產技術',
+  '電力': '電力生產與應用相關技術',
+  '建築生質能供暖': '以生質燃料為建築供暖的技術',
+  '電池交換': '以更換整組電池取代充電的電動車能源補充方式',
+  '需量反應': '依電網供需狀況調整用電行為的技術',
+  '動態充電或電動道路系統': '車輛行駛中即時充電的道路系統',
+  '燃料電池電動車用氫燃料電池': '專用於氫燃料電池車的燃料電池技術',
+  '氫基技術': '以氫氣為核心的相關技術',
+  '清潔燃料內燃船舶引擎': '使用低碳燃料的船舶內燃引擎',
+  '燃料電池電動船舶': '以燃料電池驅動的船舶',
+  '船舶': '船舶本身的淨零相關技術',
+  '天然氣發電（搭配CCUS）': '天然氣發電廠附加碳捕捉、利用與封存的技術',
+  '探勘與生產': '資源（如地熱、油氣）的探勘與生產技術',
+  '核燃料循環': '核燃料從開採、使用到後端處理的完整循環',
+  '燃料循環後端': '核燃料循環中，用過燃料的處理與最終處置階段',
+  '材料式儲存': '以特定材料（如金屬氫化物）儲存能源的技術',
+  '新型原料': '傳統原料之外的新型生產原料',
+  '熱化學水分解': '以高溫化學反應將水分解製氫的技術',
+  '其他精煉方法': '未歸類於其他分類的精煉方法',
+  '其他加熱方式': '未歸類於其他分類的加熱方式',
+  '營運': '系統或設施的營運管理技術',
+  '其他車輛': '未歸類於其他分類的車輛技術',
+  '水力發電': '利用水流發電的技術',
+  '熱製程': '利用熱能進行的工業製程'
+};
+
+// initiative.country in the cached dataset is only ever stored in English
+// (no country_zh field exists at all, unlike sector_zh/sector_en which both
+// exist) — 134 distinct raw values including multi-country combos ("China,
+// Germany") and a few source-data typos ("Irland", "Netherland",
+// "Philipines", "New Zeland"), mapped here exactly as they appear rather
+// than parsed/split, to sidestep ambiguity between combo separators (comma
+// vs slash vs "and") and place names that themselves contain a hyphen
+// ("Asia-Pacific") vs combo hyphens ("Argentina-Uruguay").
+const COUNTRY_NAMES_ZH = {
+  'Argentina': '阿根廷',
+  'Argentina-Uruguay': '阿根廷、烏拉圭',
+  'Asia-Pacific': '亞太地區',
+  'Australia': '澳洲',
+  'Australia, United Kingdom': '澳洲、英國',
+  'Austria': '奧地利',
+  'Bahrain': '巴林',
+  'Belgium': '比利時',
+  'Belgium,Germany': '比利時、德國',
+  'Brazil': '巴西',
+  'Canada': '加拿大',
+  'Canada, United States': '加拿大、美國',
+  'Chile': '智利',
+  'China': '中國',
+  'China, Europe': '中國、歐洲',
+  'China, Germany': '中國、德國',
+  'Colombia': '哥倫比亞',
+  'Croatia': '克羅埃西亞',
+  'Cuba': '古巴',
+  'Czech Republic': '捷克',
+  'Denmark': '丹麥',
+  'Denmark, India': '丹麥、印度',
+  'Denmark, Sweden': '丹麥、瑞典',
+  'Dubai': '杜拜',
+  'EU': '歐盟',
+  'Egypt': '埃及',
+  'Estonia, Netherlands': '愛沙尼亞、荷蘭',
+  'Europe': '歐洲',
+  'Europe, United States': '歐洲、美國',
+  'European Union': '歐盟',
+  'European Union and United States': '歐盟、美國',
+  'Finland': '芬蘭',
+  'Finland, United Kingdom': '芬蘭、英國',
+  'France': '法國',
+  'France, Germany': '法國、德國',
+  'France, Japan': '法國、日本',
+  'France, Netherlands': '法國、荷蘭',
+  'France, United States': '法國、美國',
+  'France/Europe': '法國、歐洲',
+  'France/Italy': '法國、義大利',
+  'Germany': '德國',
+  'Germany, France, Poland': '德國、法國、波蘭',
+  'Germany/India': '德國、印度',
+  'Ghana': '迦納',
+  'Global': '全球',
+  'Greece': '希臘',
+  'Iceland': '冰島',
+  'India': '印度',
+  'India, Europe': '印度、歐洲',
+  'India, Mexico, Burkina Faso': '印度、墨西哥、布吉納法索',
+  'India, Singapore': '印度、新加坡',
+  'Indonesia': '印尼',
+  'International': '國際',
+  'Iran, Ireland': '伊朗、愛爾蘭',
+  'Ireland': '愛爾蘭',
+  'Irland': '愛爾蘭',
+  'Israel': '以色列',
+  'Italy': '義大利',
+  'Italy, France': '義大利、法國',
+  'Italy, Switzerland': '義大利、瑞士',
+  'Japan': '日本',
+  'Japan, France': '日本、法國',
+  'Japan, United States': '日本、美國',
+  'Kazakhstan': '哈薩克',
+  'Kenya': '肯亞',
+  'Korea': '韓國',
+  'Korea, Bolivia': '韓國、玻利維亞',
+  'Luxembourg': '盧森堡',
+  'Malaysia': '馬來西亞',
+  'Mali': '馬利',
+  'Mexico': '墨西哥',
+  'Mix': '多國混合',
+  'Morocco': '摩洛哥',
+  'Namibia': '納米比亞',
+  'Namibia, Belgium': '納米比亞、比利時',
+  'Namibia, Germany': '納米比亞、德國',
+  'Nauru, China': '諾魯、中國',
+  'Netherland': '荷蘭',
+  'Netherlands': '荷蘭',
+  'New Zealand': '紐西蘭',
+  'New Zeland, United States': '紐西蘭、美國',
+  'Norway': '挪威',
+  'Oman': '阿曼',
+  'Oman / United Arab Emirates (UAE)': '阿曼、阿拉伯聯合大公國',
+  'Philipines': '菲律賓',
+  'Philippines': '菲律賓',
+  'Poland': '波蘭',
+  'Portugal': '葡萄牙',
+  'Romania': '羅馬尼亞',
+  'Rotterdam': '鹿特丹',
+  'Russia': '俄羅斯',
+  'Saudi Arabia': '沙烏地阿拉伯',
+  'Scotland': '蘇格蘭',
+  'Singapore': '新加坡',
+  'Slovakia/United States': '斯洛伐克、美國',
+  'Slovenia': '斯洛維尼亞',
+  'South Africa': '南非',
+  'South Korea': '韓國',
+  'Spain': '西班牙',
+  'Sweden': '瑞典',
+  'Switzerland': '瑞士',
+  'Switzerland / Iceland': '瑞士、冰島',
+  'Switzerland, Korea': '瑞士、韓國',
+  'Taiwan': '台灣',
+  'Thailand': '泰國',
+  'The Netherlands': '荷蘭',
+  'Turkey': '土耳其',
+  'U.S.': '美國',
+  'UAE': '阿拉伯聯合大公國',
+  'UK': '英國',
+  'UK, Germany': '英國、德國',
+  'UK, US': '英國、美國',
+  'UK, US, Netherlands': '英國、美國、荷蘭',
+  'US': '美國',
+  'US, France': '美國、法國',
+  'USA': '美國',
+  'Uganda': '烏干達',
+  'Ukraine': '烏克蘭',
+  'United Arab Emirates': '阿拉伯聯合大公國',
+  'United Kingdom': '英國',
+  'United States': '美國',
+  'United States and Belgium': '美國、比利時',
+  'United States, Albania': '美國、阿爾巴尼亞',
+  'United States, Europe': '美國、歐洲',
+  'United States, Germany': '美國、德國',
+  'United States, Japan': '美國、日本',
+  'United States, Korea': '美國、韓國',
+  'United States, Russia': '美國、俄羅斯',
+  'United States, United Kingdom': '美國、英國',
+  'United States, global': '美國、全球',
+  'Uruguay, Argentina': '烏拉圭、阿根廷',
+  'Venezuela': '委內瑞拉',
+  'Vietnam': '越南',
+  'World': '全球'
+};
+
+function translateCountry(country, uiLang) {
+  if (!country) return country;
+  return uiLang === 'en' ? country : (COUNTRY_NAMES_ZH[country] || country);
+}
+
 // In-slide microcopy (hints, prefixes, empty states) that should follow the
 // same language/wording the user asks Gemini for, same as tech names. These
 // are defaults used when geminiData.ui_labels is missing a key (e.g. the
@@ -227,7 +524,9 @@ const MODAL_CHROME_LABELS = {
 const APP_LABELS = {
   zh: {
     appTitle: 'IEA 淨零技術智慧分析平台',
+    appSubtitle: '技術資料庫查詢 & AI 洞察分析',
     datasetVersion: (v) => `資料版本: ${v}`,
+    datasetTimeLabel: '資料版本時間',
     sampleData: '測試資料',
     fallbackBadge: '目前使用測試資料',
     loadingBadge: '正在讀取 JSON 資料...',
@@ -283,6 +582,9 @@ const APP_LABELS = {
     expandCases: (n) => `展開全部 ${n} 筆`,
     strategyTitle: '查詢策略總覽',
     strategySubtitle: '根據目前查詢結果產生的整體分析，與左側清單、單一技術詳情是平行的檢視角度，不會隨你點選哪一項技術而改變。',
+    sectorDistributionTitle: '產業別分佈',
+    sectorDistributionCenterLabel: '項技術',
+    sectorDistributionHint: '滑鼠移到色塊查看細節',
     strategyCardTitle: '策略總覽與 AI 洞察',
     strategyCardDescPrefix: '立即查看目前符合條件的全部',
     strategyCardDescSuffix: '筆技術的整體分析，之後可選擇升級為 AI 深度洞察。',
@@ -300,7 +602,9 @@ const APP_LABELS = {
   },
   en: {
     appTitle: 'IEA Net-Zero Technology Intelligence Platform',
+    appSubtitle: 'Technology Database Search & AI Insight Analysis',
     datasetVersion: (v) => `Dataset version: ${v}`,
+    datasetTimeLabel: 'Dataset Generated',
     sampleData: 'Sample data',
     fallbackBadge: 'Currently showing sample data',
     loadingBadge: 'Loading JSON data...',
@@ -356,6 +660,9 @@ const APP_LABELS = {
     expandCases: (n) => `Show all ${n}`,
     strategyTitle: 'Query Strategy Overview',
     strategySubtitle: 'An aggregate analysis of the current query results — a view parallel to the list and the single-technology detail, unaffected by whichever technology you select.',
+    sectorDistributionTitle: 'Sector Distribution',
+    sectorDistributionCenterLabel: 'technologies',
+    sectorDistributionHint: 'Hover a segment for details',
     strategyCardTitle: 'Strategy Overview & AI Insight',
     strategyCardDescPrefix: 'Instantly view an overview of all',
     strategyCardDescSuffix: 'matching technologies, with the option to upgrade to AI-generated insight afterwards.',
@@ -519,12 +826,15 @@ function techLabel(tech) {
   return tech.technology_name_zh || tech.technology_name || '未標示';
 }
 
-function computeTechStats(techs) {
+function computeTechStats(techs, uiLang = 'zh') {
   const totalFound = techs.length;
 
   const sectorCounts = {};
-  techs.forEach(r => { const s = r.sector_zh || '未標示'; sectorCounts[s] = (sectorCounts[s] || 0) + 1; });
-  const topSector = Object.entries(sectorCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '未標示';
+  techs.forEach(r => {
+    const s = (uiLang === 'en' ? r.sector_en : r.sector_zh) || (uiLang === 'en' ? 'Unlabeled' : '未標示');
+    sectorCounts[s] = (sectorCounts[s] || 0) + 1;
+  });
+  const topSector = Object.entries(sectorCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || (uiLang === 'en' ? 'Unlabeled' : '未標示');
 
   // { id, name } per bucket (not just ids) so the UI can drill down from a
   // TRL bar into the exact technologies behind it, with a display name that
@@ -548,7 +858,8 @@ function computeTechStats(techs) {
   const countryGroups = {};
   allInitiatives.forEach(i => {
     if (!i.country) return;
-    (countryGroups[i.country] = countryGroups[i.country] || []).push(i);
+    const country = translateCountry(i.country, uiLang);
+    (countryGroups[country] = countryGroups[country] || []).push(i);
   });
   // {name, count, initiatives} per country (not just a name) so slide3 can
   // render an actual bar chart proportional to case volume, and drill down
@@ -641,7 +952,7 @@ ${csvStr}
 // are structurally different, not just differently-worded restatements of
 // the same stats.
 function buildFallbackAnalysis(techs, uiLang = 'zh') {
-  const { totalFound, topSector, trlBreakdown, allInitiatives, topCountries, topTechs } = computeTechStats(techs);
+  const { totalFound, topSector, trlBreakdown, allInitiatives, topCountries, topTechs } = computeTechStats(techs, uiLang);
   const top5Countries = topCountries.slice(0, 5);
   const nameFor = (t) => (uiLang === 'en' ? (t.technology_name || techLabel(t)) : techLabel(t));
   const localizedTrlBreakdown = trlBreakdown.map(b => ({ ...b, stage: trlStageLabel(b.stage, uiLang) }));
@@ -659,9 +970,9 @@ function buildFallbackAnalysis(techs, uiLang = 'zh') {
         subtitle: `Analyzed ${totalFound} net-zero technologies`,
         summary: `This query covers ${totalFound} technologies, mostly concentrated in the "${topSector}" sector, linked to ${allInitiatives.length} policy cases.`,
         kpis: [
-          { value: totalFound, label: "Technologies" },
-          { value: allInitiatives.length, label: "Related cases" },
-          { value: topCountries.length, label: "Countries covered" }
+          { value: totalFound, label: "Technologies", caption: "Matched to this query" },
+          { value: allInitiatives.length, label: "Related cases", caption: "Linked case records" },
+          { value: topCountries.length, label: "Countries covered", caption: "Regions represented" }
         ]
       },
       slide2: {
@@ -692,9 +1003,9 @@ function buildFallbackAnalysis(techs, uiLang = 'zh') {
       subtitle: `共分析 ${totalFound} 項淨零技術`,
       summary: `本次查詢涵蓋 ${totalFound} 項技術，主要集中於「${topSector}」領域，共連結 ${allInitiatives.length} 筆政策案例。`,
       kpis: [
-        { value: totalFound, label: "技術項目" },
-        { value: allInitiatives.length, label: "相關案例" },
-        { value: topCountries.length, label: "涵蓋國家" }
+        { value: totalFound, label: "技術項目", caption: "符合本次查詢條件" },
+        { value: allInitiatives.length, label: "相關案例", caption: "已連結案例紀錄" },
+        { value: topCountries.length, label: "涵蓋國家", caption: "案例分布地區數" }
       ]
     },
     slide2: {
@@ -740,7 +1051,7 @@ function buildArticleMarkdown(techs, uiLang = 'zh') {
       return isEn ? '(No linked cases)' : '（無相關案例資料）';
     }
     return initiatives.map((init, i) => {
-      const meta = [init.year, init.country, init.type].filter(Boolean).join(' / ');
+      const meta = [init.year, translateCountry(init.country, uiLang), init.type].filter(Boolean).join(' / ');
       let line = `${i + 1}. ${meta ? `[${meta}] ` : ''}${init.description || (isEn ? 'Unlabeled' : '未標示')}`;
       if (init.read_more) line += ` (${init.read_more})`;
       return line;
@@ -1297,6 +1608,16 @@ function AIAnalysisModal({ geminiData, isAI, isUpgrading, hasApiKey, onUpgrade, 
   );
 }
 
+// One color+icon per slide1 KPI card (technologies / cases / countries, in
+// that fixed order from buildFallbackAnalysis) — distinct per-card accents
+// rather than all three sharing slide1's single accentColor, matching the
+// "colored left border + watermark icon" stat-card look.
+const KPI_CARD_STYLES = [
+  { color: '#2563EB', Icon: Database },
+  { color: '#059669', Icon: FileText },
+  { color: '#7C3AED', Icon: Globe },
+];
+
 // ─── Slide Preview Component (White/Light style) ─────────────────────────────
 
 function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJumpToTech, uiLabels, uiLang }) {
@@ -1380,15 +1701,28 @@ function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJump
               <p className="text-base text-slate-700 leading-relaxed mb-4">{slide.summary}</p>
             )}
 
-            {/* KPIs (slide 1) */}
+            {/* KPIs (slide 1) — colored left border + big number + faint
+                watermark icon + bottom caption, one accent per card. */}
             {slide.kpis && Array.isArray(slide.kpis) && (
               <div className="grid grid-cols-3 gap-3 mt-2">
-                {slide.kpis.map((kpi, i) => (
-                  <div key={i} className="rounded-lg p-3 border" style={{ borderColor: accentColor + '30', background: accentColor + '08' }}>
-                    <div className="text-2xl font-black" style={{ color: accentColor }}>{kpi.value}</div>
-                    <div className="text-sm text-slate-500 mt-0.5">{kpi.label}</div>
-                  </div>
-                ))}
+                {slide.kpis.map((kpi, i) => {
+                  const style = KPI_CARD_STYLES[i % KPI_CARD_STYLES.length];
+                  const CardIcon = style.Icon;
+                  return (
+                    <div
+                      key={i}
+                      className="relative overflow-hidden rounded-lg p-3 bg-white border border-slate-200"
+                      style={{ borderLeftWidth: '4px', borderLeftColor: style.color }}
+                    >
+                      <CardIcon size={56} className="absolute -right-3 -bottom-3 opacity-[0.08] pointer-events-none" style={{ color: style.color }} />
+                      <div className="relative text-2xl font-black" style={{ color: style.color }}>{kpi.value}</div>
+                      <div className="relative text-sm text-slate-500 mt-0.5">{kpi.label}</div>
+                      {kpi.caption && (
+                        <div className="relative text-xs text-slate-400 mt-1.5 pt-1.5 border-t border-slate-100">{kpi.caption}</div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -2343,6 +2677,178 @@ export default function App() {
   );
 }
 
+// ─── Loading Skeleton ────────────────────────────────────────────────────────
+// Shown in place of the real left/right panels only during the very first
+// background fetch (isSampleData still true, status still 'loading') — the
+// app initializes rows from a 5-item embedded sample dataset, so without
+// this the user would otherwise see a real, clickable search UI whose
+// results come from those 5 fake rows for the few seconds it takes to pull
+// down the real ~4.7MB dataset, then have it all pop/swap out from under
+// them. Static, non-interactive placeholders sidestep both problems.
+
+function SkeletonBlock({ className }) {
+  return <div className={`bg-slate-200 rounded animate-pulse ${className || ''}`} />;
+}
+
+function SkeletonListItem({ nameWidth }) {
+  return (
+    <div className="p-2.5 flex flex-col gap-2">
+      <div className="flex justify-between items-start gap-2">
+        <SkeletonBlock className={`h-4 ${nameWidth}`} />
+        <SkeletonBlock className="h-4 w-12 flex-shrink-0" />
+      </div>
+      <SkeletonBlock className="h-3 w-2/3" />
+      <div className="flex justify-between items-center mt-0.5">
+        <SkeletonBlock className="h-3 w-16" />
+        <SkeletonBlock className="h-3 w-10" />
+      </div>
+    </div>
+  );
+}
+
+const SKELETON_LIST_WIDTHS = ['w-3/4', 'w-2/3', 'w-4/5', 'w-1/2', 'w-3/5', 'w-2/3', 'w-3/4', 'w-1/2'];
+
+function SkeletonMain() {
+  return (
+    <main className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0" aria-busy="true">
+      {/* Left panel skeleton — same widths as the real left panel section
+          so nothing visibly shifts when the real content swaps in. */}
+      <section className="w-full md:w-[400px] lg:w-[460px] flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-white flex flex-col h-1/2 md:h-full min-h-0">
+        <div className="p-4 border-b border-slate-100 bg-slate-50 flex-shrink-0 space-y-3">
+          <div className="flex gap-2">
+            <SkeletonBlock className="h-8 flex-1 rounded-md" />
+            <SkeletonBlock className="h-8 flex-1 rounded-md" />
+          </div>
+          <SkeletonBlock className="h-9 w-full rounded-lg" />
+          <SkeletonBlock className="h-10 w-full rounded-lg" />
+          <SkeletonBlock className="h-3 w-4/5" />
+        </div>
+        <div className="flex-1 overflow-hidden p-2 space-y-1">
+          {SKELETON_LIST_WIDTHS.map((w, i) => <SkeletonListItem key={i} nameWidth={w} />)}
+        </div>
+      </section>
+
+      {/* Right panel skeleton */}
+      <section className="flex-1 flex flex-col bg-slate-50 overflow-hidden h-1/2 md:h-full min-h-0">
+        <div className="flex items-center gap-6 border-b border-slate-200 bg-white px-4 md:px-6 py-3 flex-shrink-0">
+          <SkeletonBlock className="h-5 w-20" />
+          <SkeletonBlock className="h-5 w-28" />
+        </div>
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="w-full max-w-md space-y-3">
+            <SkeletonBlock className="h-6 w-2/3 mx-auto" />
+            <SkeletonBlock className="h-4 w-1/2 mx-auto" />
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+// Hand-rolled SVG donut (no charting library) — stacks colored arcs via
+// strokeDasharray/strokeDashoffset on concentric circles of the same
+// radius, rotated -90deg so the first segment starts at 12 o'clock. Used in
+// the Strategy tab's sector-distribution card: no static legend — hovering
+// a segment previews it (thicker ring + center label swap); clicking a
+// segment locks that preview in place until either that same segment is
+// clicked again or the click lands elsewhere within the chart (the empty
+// hole, not a segment). While locked, hovering a *different* segment still
+// shows a temporary preview of that one and reverts back to the lock on
+// mouse-leave, not to the total. pointerEvents:'stroke' is set explicitly
+// because a fill="none" ring otherwise only reports pointer events
+// inconsistently across browsers on its empty interior. onLockChange (if
+// given) fires with the locked segment or null, so the parent card can
+// show a summary underneath while a segment is locked.
+function DonutChart({ segments, centerValue, centerLabel, size = 132, strokeWidth = 18, onLockChange }) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [lockedIndex, setLockedIndex] = useState(null);
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const total = segments.reduce((sum, s) => sum + s.value, 0) || 1;
+  let cumulative = 0;
+
+  const displayIndex = hoveredIndex !== null ? hoveredIndex : lockedIndex;
+  const displayed = displayIndex !== null ? segments[displayIndex] : null;
+
+  const applyLock = (idx) => {
+    setLockedIndex(idx);
+    if (onLockChange) onLockChange(idx !== null ? segments[idx] : null);
+  };
+
+  return (
+    <div
+      className="relative flex-shrink-0"
+      style={{ width: size, height: size }}
+      onClick={() => applyLock(null)}
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#F1F5F9" strokeWidth={strokeWidth} />
+        {segments.map((seg, i) => {
+          const fraction = seg.value / total;
+          const dash = fraction * circumference;
+          const offset = -cumulative * circumference;
+          cumulative += fraction;
+          const isActive = displayIndex === i;
+          const isDimmed = displayIndex !== null && !isActive;
+          return (
+            <circle
+              key={i}
+              cx={size / 2} cy={size / 2} r={radius}
+              fill="none"
+              stroke={seg.color}
+              strokeWidth={isActive ? strokeWidth + 4 : strokeWidth}
+              strokeDasharray={`${dash} ${circumference - dash}`}
+              strokeDashoffset={offset}
+              style={{
+                pointerEvents: 'stroke',
+                cursor: 'pointer',
+                opacity: isDimmed ? 0.4 : 1,
+                transition: 'stroke-width 0.15s ease, opacity 0.15s ease, filter 0.15s ease',
+                filter: isActive ? `drop-shadow(0 0 5px ${seg.color}) drop-shadow(0 0 10px ${seg.color}80)` : 'none'
+              }}
+              onMouseEnter={() => setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              onClick={(e) => { e.stopPropagation(); applyLock(lockedIndex === i ? null : i); }}
+            />
+          );
+        })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-4 text-center">
+        {displayed ? (
+          <>
+            <div className="text-3xl font-black text-slate-800">{displayed.value}</div>
+            <div className="text-base text-slate-500 leading-snug line-clamp-2">{displayed.label}</div>
+          </>
+        ) : (
+          <>
+            <div className="text-4xl font-black text-slate-800">{centerValue}</div>
+            <div className="text-sm text-slate-400">{centerLabel}</div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Purely decorative header background — a slowly spinning wind turbine
+// silhouette and (used alongside it in the header) a scrolling wave strip,
+// both on-theme for a clean-energy platform rather than generic tech
+// particle effects. Rendered at low opacity, pointer-events-none, and
+// behind the real header content via z-index — decoration, not content.
+function WindTurbineIcon({ className, style, duration }) {
+  return (
+    <svg viewBox="0 0 100 140" className={className} style={style} aria-hidden="true">
+      <line x1="50" y1="60" x2="50" y2="140" stroke="white" strokeWidth="3" />
+      <g className="animate-spin-slow" style={{ animationDuration: duration || '9s' }}>
+        <ellipse cx="50" cy="32" rx="6" ry="28" fill="white" />
+        <ellipse cx="50" cy="32" rx="6" ry="28" fill="white" transform="rotate(120 50 60)" />
+        <ellipse cx="50" cy="32" rx="6" ry="28" fill="white" transform="rotate(240 50 60)" />
+      </g>
+      <circle cx="50" cy="60" r="4" fill="white" />
+    </svg>
+  );
+}
+
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 function Dashboard({
@@ -2359,6 +2865,10 @@ function Dashboard({
   uiLang, setUiLang
 }) {
   const L = APP_LABELS[uiLang];
+  // True only for the very first background fetch — see SkeletonMain's
+  // comment for why this specific condition (not just appState.status)
+  // matters.
+  const isInitialLoading = isSampleData && appState.status === 'loading';
   const [showAllInitiatives, setShowAllInitiatives] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -2371,6 +2881,17 @@ function Dashboard({
     rows.reduce((sum, tech) => sum + (Array.isArray(tech.initiatives) ? tech.initiatives.length : 0), 0);
 
   const datasetVersion = (dataset.dataset_version || "IEA ETP Clean Energy Tech").replace(/ 2026/g, '');
+
+  // Header's "dataset generated at" box — real data (dataset.generated_at
+  // from the cached JSON), never a fake live-refresh countdown, since this
+  // dataset is a static snapshot, not a streaming feed.
+  const generatedAtLabel = (() => {
+    if (isSampleData) return L.sampleData;
+    const raw = dataset?.generated_at;
+    const d = raw ? new Date(raw) : null;
+    if (!d || isNaN(d.getTime())) return '—';
+    return d.toLocaleString(uiLang === 'en' ? 'en-US' : 'zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  })();
 
   const searchData = useMemo(() => {
     if (!query.trim() && !selectedSector) return { results: [], totalMatches: 0 };
@@ -2431,6 +2952,84 @@ function Dashboard({
 
   const totalMatches = searchData.totalMatches;
   const totalPages = Math.max(1, Math.ceil(totalMatches / 20));
+
+  // Sector-distribution donut for the Strategy tab landing page — live off
+  // whatever the current search/filter has matched, so it updates the same
+  // way "共 N 筆" already does, no separate selection mechanism needed.
+  const sectorDonutData = useMemo(() => {
+    const counts = {};
+    searchData.results.forEach(r => {
+      const s = (uiLang === 'en' ? r.tech.sector_en : r.tech.sector_zh) || (uiLang === 'en' ? 'Unlabeled' : '未標示');
+      counts[s] = (counts[s] || 0) + 1;
+    });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    // Back to the original sky/violet/pink/amber/emerald hue set (not the
+    // page-accent blue/emerald/purple/amber/teal reuse), but one shade
+    // lighter across the board for a brighter, less saturated "tech" look
+    // — the blue tone in particular read too saturated at full strength.
+    const palette = ['#7DD3FC', '#C4B5FD', '#F9A8D4', '#FCD34D', '#6EE7B7'];
+    const top = sorted.slice(0, 5).map(([name, count], i) => ({ label: name, value: count, color: palette[i % palette.length] }));
+    const restCount = sorted.slice(5).reduce((sum, [, c]) => sum + c, 0);
+    if (restCount > 0) top.push({ label: uiLang === 'en' ? 'Other' : '其他', value: restCount, color: '#94A3B8' });
+    return top;
+  }, [searchData.results, uiLang]);
+
+  // Locked-segment summary sentence — rule-based, not AI-generated. Only
+  // the zh definitions in SECTOR_DEFINITIONS were hand-reviewed, so English
+  // mode skips that clause rather than guessing a translation.
+  const [lockedSector, setLockedSector] = useState(null);
+
+  const lockedSectorStats = useMemo(() => {
+    if (!lockedSector) return null;
+    const sectorName = lockedSector.label;
+    const techsInSector = searchData.results
+      .map(r => r.tech)
+      .filter(t => ((uiLang === 'en' ? t.sector_en : t.sector_zh) || (uiLang === 'en' ? 'Unlabeled' : '未標示')) === sectorName);
+    if (techsInSector.length === 0) return null;
+
+    const trlCounts = [0, 0, 0, 0];
+    techsInSector.forEach(t => {
+      const trl = parseInt(t.latest_trl) || 0;
+      let bucket = -1;
+      if (trl > 0 && trl <= 3) bucket = 0;
+      else if (trl <= 6) bucket = 1;
+      else if (trl <= 8) bucket = 2;
+      else if (trl > 8) bucket = 3;
+      if (bucket >= 0) trlCounts[bucket]++;
+    });
+    let topBucket = 0;
+    trlCounts.forEach((c, i) => { if (c > trlCounts[topBucket]) topBucket = i; });
+
+    const initiativesInSector = techsInSector.flatMap(t => t.initiatives || []);
+    const caseCount = initiativesInSector.length;
+    const countryCounts = {};
+    initiativesInSector.forEach(i => {
+      if (!i.country) return;
+      const country = translateCountry(i.country, uiLang);
+      countryCounts[country] = (countryCounts[country] || 0) + 1;
+    });
+    const topCountryEntry = Object.entries(countryCounts).sort((a, b) => b[1] - a[1])[0];
+
+    return {
+      count: techsInSector.length,
+      topStage: TRL_COMPACT_LABELS_ZH[topBucket],
+      caseCount,
+      topCountry: topCountryEntry ? topCountryEntry[0] : null,
+      definition: SECTOR_DEFINITIONS[sectorName] || null
+    };
+  }, [lockedSector, searchData.results, uiLang]);
+
+  const lockedSectorSummary = useMemo(() => {
+    if (!lockedSector || !lockedSectorStats) return null;
+    const { count, topStage, caseCount, topCountry, definition } = lockedSectorStats;
+    if (uiLang === 'en') {
+      const countryClause = topCountry ? `, most active in ${topCountry}` : '';
+      return `"${lockedSector.label}" currently has ${count} technologies, mostly at ${topStage}; ${caseCount} related cases in total${countryClause}.`;
+    }
+    const defClause = definition ? `（${definition}）` : '';
+    const countryClause = topCountry ? `，以${topCountry}最為活躍` : '';
+    return `「${lockedSector.label}」${defClause}目前有 ${count} 項技術，成熟度以 ${topStage} 階段為主；共連結 ${caseCount} 筆案例${countryClause}。`;
+  }, [lockedSector, lockedSectorStats, uiLang]);
 
   const paginatedResults = useMemo(() => {
     const startIndex = (currentPage - 1) * 20;
@@ -2520,36 +3119,94 @@ function Dashboard({
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col font-sans overflow-hidden">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row justify-between items-center shadow-sm z-10 flex-shrink-0">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-slate-800">{L.appTitle}</h1>
-          <div className="text-base mt-1.5 flex items-center gap-2 flex-wrap">
-            <span className="text-slate-500 font-medium">{L.datasetVersion(isSampleData ? L.sampleData : datasetVersion)}</span>
-            {appState.status === 'fallback' && <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-sm border border-amber-200">{L.fallbackBadge}</span>}
-            {appState.status === 'loading' && <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-sm border border-blue-200 animate-pulse">{L.loadingBadge}</span>}
-            {appState.status === 'success' && (
-              <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-sm border border-emerald-200 flex items-center gap-1">
-                <CheckCircle2 size={12} /> {L.successBadge(techCount, initiativeCount)}
-              </span>
-            )}
-            {appState.status === 'success' && appState.isRawFormat && (
-              <span className="bg-sky-100 text-sky-800 px-2 py-0.5 rounded text-sm border border-sky-200">{L.rawFormatDetected}</span>
-            )}
-            {appState.status === 'error' && (
-              <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded text-sm border border-red-200 flex items-center gap-1">
-                <AlertCircle size={12} /> {appState.errorMsg}
-              </span>
+      {/* Header — vibrant blue gradient with a decorative, on-theme
+          animated background (slow-spinning wind turbines + a scrolling
+          wave strip) instead of generic tech particle effects, since this
+          is a clean-energy platform. The dataset-time box on the right
+          always shows dataset.generated_at (a real, static timestamp from
+          the cached JSON), never a live-refresh countdown — this dataset
+          doesn't auto-update, so implying it does would be misleading. */}
+      <header className="relative overflow-hidden bg-gradient-to-br from-cyan-500 via-blue-600 to-blue-800 px-6 py-5 shadow-lg z-10 flex-shrink-0">
+        {/* Decorative background — pointer-events-none, low opacity, sits
+            behind the real content (z-0) so it never interferes with
+            reading or clicking anything above it (z-10). */}
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-20">
+          {/* Positioned in the header's open middle zone — the left edge
+              is title text, the right edge is the dataset-time box and
+              reload button, both of which these must stay clear of. */}
+          <WindTurbineIcon className="absolute -top-4 left-[62%] w-16 h-24" duration="10s" />
+          <WindTurbineIcon className="absolute -top-2 left-[70%] w-11 h-16" duration="8s" />
+          <WindTurbineIcon className="absolute top-1 left-[77%] w-9 h-14" duration="11s" />
+          <div className="absolute bottom-0 left-0 w-full h-6 overflow-hidden">
+            <div className="flex animate-wave-scroll" style={{ width: '200%' }}>
+              <svg viewBox="0 0 1200 40" className="w-1/2 flex-shrink-0" preserveAspectRatio="none">
+                <path d="M0,20 Q150,0 300,20 T600,20 T900,20 T1200,20 L1200,40 L0,40 Z" fill="white" />
+              </svg>
+              <svg viewBox="0 0 1200 40" className="w-1/2 flex-shrink-0" preserveAspectRatio="none">
+                <path d="M0,20 Q150,0 300,20 T600,20 T900,20 T1200,20 L1200,40 L0,40 Z" fill="white" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          {/* Left: icon badge + title + status */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="bg-white/15 border border-white/20 text-white rounded-xl p-2.5 flex-shrink-0">
+              <Sparkles size={22} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl md:text-2xl font-bold text-white truncate">{L.appTitle}</h1>
+              <div className="text-sm mt-1 flex items-center gap-2 flex-wrap">
+                <span className="text-blue-100 font-medium">{L.appSubtitle}</span>
+                <span className="text-blue-300">·</span>
+                <span className="text-blue-100 font-medium">{L.datasetVersion(isSampleData ? L.sampleData : datasetVersion)}</span>
+                {appState.status === 'fallback' && <span className="bg-white/15 text-white border border-white/20 px-2 py-0.5 rounded text-sm">{L.fallbackBadge}</span>}
+                {appState.status === 'loading' && <span className="bg-white/15 text-white border border-white/20 px-2 py-0.5 rounded text-sm animate-pulse">{L.loadingBadge}</span>}
+                {appState.status === 'success' && (
+                  <span className="bg-white/15 text-white border border-white/20 px-2 py-0.5 rounded text-sm flex items-center gap-1">
+                    <CheckCircle2 size={12} /> {L.successBadge(techCount, initiativeCount)}
+                  </span>
+                )}
+                {appState.status === 'success' && appState.isRawFormat && (
+                  <span className="bg-white/15 text-white border border-white/20 px-2 py-0.5 rounded text-sm">{L.rawFormatDetected}</span>
+                )}
+                {appState.status === 'error' && (
+                  <span className="bg-red-500/20 text-red-200 border border-red-300/40 px-2 py-0.5 rounded text-sm flex items-center gap-1">
+                    <AlertCircle size={12} /> {appState.errorMsg}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: dataset-generated-at box + restore-default ("reload") button */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="bg-white/15 border border-white/20 rounded-xl px-4 py-2 text-right">
+              <div className="text-[11px] uppercase tracking-wider text-blue-100 font-semibold">{L.datasetTimeLabel}</div>
+              <div className="text-sm font-bold text-white mt-0.5 whitespace-nowrap">{generatedAtLabel}</div>
+            </div>
+            {isCustomUpload && (
+              <button
+                type="button"
+                onClick={onRestoreDefault}
+                title={L.restoreDefaultData}
+                className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/10 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
+              >
+                <RotateCcw size={14} /> {L.restoreDefaultData}
+              </button>
             )}
           </div>
         </div>
-        <div className="mt-4 md:mt-0 flex flex-wrap items-center gap-4 text-base">
+
+        {/* Secondary row: platform controls (language, AI provider, API key, upload) */}
+        <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center gap-3 text-base">
 
           <button
             type="button"
             onClick={() => setUiLang(l => (l === 'zh' ? 'en' : 'zh'))}
             title="Switch platform language / 切換平台語言"
-            className="text-sm font-medium px-3 py-1.5 rounded-full border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors flex-shrink-0"
+            className="text-sm font-medium px-3 py-1.5 rounded-full border border-white/20 text-slate-200 hover:bg-white/10 transition-colors flex-shrink-0"
           >
             {uiLang === 'zh' ? 'EN' : '中文'}
           </button>
@@ -2558,9 +3215,9 @@ function Dashboard({
             value={aiProvider}
             onChange={e => onProviderChange(e.target.value)}
             title={L.aiProviderLabel}
-            className="text-sm font-medium px-2 py-1.5 rounded-lg border border-slate-300 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-sm font-medium px-2 py-1.5 rounded-lg border border-white/20 text-slate-100 bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-300"
           >
-            {AI_PROVIDER_ORDER.map(p => <option key={p} value={p}>{AI_PROVIDERS[p].label}</option>)}
+            {AI_PROVIDER_ORDER.map(p => <option key={p} value={p} className="text-slate-800">{AI_PROVIDERS[p].label}</option>)}
           </select>
 
           {aiProvider === 'openrouter' && (
@@ -2569,53 +3226,43 @@ function Dashboard({
               value={openRouterModel}
               onChange={e => onOpenRouterModelChange(e.target.value)}
               placeholder={L.openRouterModelPlaceholder}
-              className="text-sm text-slate-700 placeholder:text-slate-400 border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 w-44"
+              className="text-sm text-slate-100 placeholder:text-slate-400 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300 w-44"
               autoComplete="off"
               spellCheck={false}
             />
           )}
 
-          <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg pl-3 pr-1.5 py-1.5">
-            <KeyRound size={14} className={apiKey.trim() ? 'text-emerald-500' : 'text-slate-400'} />
+          <div className="flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-lg pl-3 pr-1.5 py-1.5">
+            <KeyRound size={14} className={apiKey.trim() ? 'text-emerald-400' : 'text-slate-400'} />
             <input
               type={showApiKey ? 'text' : 'password'}
               value={apiKey}
               onChange={e => onApiKeyChange(e.target.value)}
               placeholder={L.apiKeyPlaceholder(AI_PROVIDERS[aiProvider].label)}
-              className="text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none w-40"
+              className="text-sm text-slate-100 placeholder:text-slate-400 bg-transparent focus:outline-none w-40"
               autoComplete="off"
               spellCheck={false}
             />
             <button
               type="button"
               onClick={() => setShowApiKey(v => !v)}
-              className="text-slate-400 hover:text-slate-600 p-1 rounded transition-colors"
+              className="text-slate-400 hover:text-slate-200 p-1 rounded transition-colors"
               title={showApiKey ? L.hideKey : L.showKey}
             >
               {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
           </div>
 
-          <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-white font-medium py-1.5 px-4 rounded-lg transition-colors flex items-center gap-2">
+          <label className="cursor-pointer bg-white text-blue-800 hover:bg-blue-50 font-medium py-1.5 px-4 rounded-lg transition-colors flex items-center gap-2">
             <FileJson size={16} />
             <span>{L.uploadJson}</span>
             <input type="file" accept=".json" className="hidden" onChange={onUpload} />
           </label>
-
-          {isCustomUpload && (
-            <button
-              type="button"
-              onClick={onRestoreDefault}
-              title={L.restoreDefaultData}
-              className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors"
-            >
-              <RotateCcw size={14} /> {L.restoreDefaultData}
-            </button>
-          )}
         </div>
       </header>
 
       {/* Main layout */}
+      {isInitialLoading ? <SkeletonMain /> : (
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
 
         {/* Left panel */}
@@ -2797,7 +3444,7 @@ function Dashboard({
                             <div key={idx} className="border-l-2 border-emerald-400 pl-4 py-1">
                               <div className="flex flex-wrap gap-2 mb-1 text-sm font-medium text-slate-500">
                                 {init.year && <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{init.year}</span>}
-                                {init.country && <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100">{init.country}</span>}
+                                {init.country && <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100">{translateCountry(init.country, uiLang)}</span>}
                                 {init.type && <span className="text-blue-600">{init.type}</span>}
                               </div>
                               <p className="text-base text-slate-700 leading-relaxed mt-1">
@@ -2823,78 +3470,102 @@ function Dashboard({
 
             {rightPanelTab === 'strategy' && (
               <div className="flex-1 flex flex-col overflow-y-auto p-4 md:p-8 w-full">
-                <div className="max-w-2xl mx-auto w-full space-y-6">
-                  <div>
+                <div className="max-w-6xl mx-auto w-full">
+                  <div className="mb-6">
                     <h2 className="text-xl font-bold text-slate-800">{L.strategyTitle}</h2>
                     <p className="text-base text-slate-500 mt-1">{L.strategySubtitle}</p>
                   </div>
 
-                  {/* Strategy overview card — opens instantly with a rule-based
-                      summary; the option to upgrade to an AI-generated version
-                      lives inside that same modal, so this is one progressive
-                      entry point rather than two separate, overlapping ones. */}
-                  <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
-                    <div className="flex items-start gap-4 mb-5">
-                      <div className="bg-gradient-to-br from-purple-500 to-blue-500 text-white rounded-xl p-3 flex-shrink-0">
-                        <Sparkles size={22} />
+                  <div className="flex flex-col lg:flex-row gap-6 items-stretch">
+                    {/* Sector-distribution donut — a purely informational
+                        preview (no click/navigation of its own) of the
+                        current search results, so it doesn't compete with
+                        the two action cards as a third entry point. Same
+                        plain-white-card look as the two beside it, just
+                        with a blue accent, for a cleaner and more cohesive
+                        page instead of a separate dark "control room" card. */}
+                    {totalMatches > 0 && (
+                      <div className="lg:w-[340px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-blue-500 p-6 md:p-8 flex flex-col items-center">
+                        <h3 className="text-lg font-bold text-slate-800 mb-1 self-start">{L.sectorDistributionTitle}</h3>
+                        <p className="text-xs text-slate-400 mb-5 self-start">{L.sectorDistributionHint}</p>
+                        <DonutChart segments={sectorDonutData} centerValue={totalMatches} centerLabel={L.sectorDistributionCenterLabel} size={208} strokeWidth={22} onLockChange={setLockedSector} />
+                        {lockedSectorSummary && (
+                          <p className="text-base text-slate-600 leading-relaxed mt-5 pt-4 border-t border-slate-100 self-stretch">
+                            {lockedSectorSummary}
+                          </p>
+                        )}
                       </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-slate-800">{L.strategyCardTitle}</h3>
-                        <p className="text-base text-slate-500 mt-1 leading-relaxed">
-                          {L.strategyCardDescPrefix} <span className="font-semibold text-slate-700">{totalMatches}</span> {L.strategyCardDescSuffix}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => onOpenStrategyOverview(searchData)}
-                      disabled={totalMatches === 0}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-all"
-                    >
-                      <Sparkles size={18} /> {L.openStrategyBtn}
-                    </button>
-                  </div>
+                    )}
 
-                  {/* Export card */}
-                  <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
-                    <div className="flex items-start gap-4 mb-5">
-                      <div className="bg-emerald-50 text-emerald-600 rounded-xl p-3 flex-shrink-0">
-                        <Download size={22} />
+                    <div className="flex-1 space-y-6 min-w-0">
+                      {/* Strategy overview card — opens instantly with a rule-based
+                          summary; the option to upgrade to an AI-generated version
+                          lives inside that same modal, so this is one progressive
+                          entry point rather than two separate, overlapping ones. */}
+                      <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-purple-500">
+                        <div className="flex items-start gap-4 mb-5">
+                          <div className="bg-gradient-to-br from-purple-500 to-blue-500 text-white rounded-xl p-3 flex-shrink-0">
+                            <Sparkles size={22} />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-slate-800">{L.strategyCardTitle}</h3>
+                            <p className="text-base text-slate-500 mt-1 leading-relaxed">
+                              {L.strategyCardDescPrefix} <span className="font-semibold text-slate-700">{totalMatches}</span> {L.strategyCardDescSuffix}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => onOpenStrategyOverview(searchData)}
+                          disabled={totalMatches === 0}
+                          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-all"
+                        >
+                          <Sparkles size={18} /> {L.openStrategyBtn}
+                        </button>
                       </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-slate-800">{L.exportStrategyTitle}</h3>
-                        <p className="text-base text-slate-500 mt-1 leading-relaxed">
-                          {L.exportStrategyDescPrefix} <span className="font-semibold text-slate-700">{totalMatches}</span> {L.exportStrategyDescSuffix}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        onClick={handleExportListCsv}
-                        disabled={totalMatches === 0}
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
-                      >
-                        <Download size={18} /> {L.exportAll}
-                      </button>
-                    </div>
 
-                    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-3 items-center">
-                      <button
-                        onClick={handleCopyListArticle}
-                        disabled={totalMatches === 0}
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:cursor-not-allowed text-slate-700 border border-slate-300 shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
-                      >
-                        <Copy size={18} /> {copiedArticleKey === 'list' ? L.copied : L.copyArticle}
-                      </button>
-                      <a
-                        href="https://notebooklm.google.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
-                      >
-                        <ExternalLink size={18} /> {L.openNotebookLM}
-                      </a>
+                      {/* Export card */}
+                      <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-emerald-500">
+                        <div className="flex items-start gap-4 mb-5">
+                          <div className="bg-emerald-50 text-emerald-600 rounded-xl p-3 flex-shrink-0">
+                            <Download size={22} />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-slate-800">{L.exportStrategyTitle}</h3>
+                            <p className="text-base text-slate-500 mt-1 leading-relaxed">
+                              {L.exportStrategyDescPrefix} <span className="font-semibold text-slate-700">{totalMatches}</span> {L.exportStrategyDescSuffix}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            onClick={handleExportListCsv}
+                            disabled={totalMatches === 0}
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
+                          >
+                            <Download size={18} /> {L.exportAll}
+                          </button>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-3 items-center">
+                          <button
+                            onClick={handleCopyListArticle}
+                            disabled={totalMatches === 0}
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:cursor-not-allowed text-slate-700 border border-slate-300 shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
+                          >
+                            <Copy size={18} /> {copiedArticleKey === 'list' ? L.copied : L.copyArticle}
+                          </button>
+                          <a
+                            href="https://notebooklm.google.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
+                          >
+                            <ExternalLink size={18} /> {L.openNotebookLM}
+                          </a>
+                        </div>
+                        <p className="text-sm text-slate-400 mt-3 leading-relaxed">{L.copyArticleReminder}</p>
+                      </div>
                     </div>
-                    <p className="text-sm text-slate-400 mt-3 leading-relaxed">{L.copyArticleReminder}</p>
                   </div>
                 </div>
               </div>
@@ -2902,6 +3573,7 @@ function Dashboard({
           </div>
         </section>
       </main>
+      )}
 
       <footer className="bg-slate-800 text-slate-400 text-sm py-3 px-6 text-center z-30 flex-shrink-0">
         {L.footerDisclaimer}
