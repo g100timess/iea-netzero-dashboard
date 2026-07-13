@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, FileJson, AlertCircle, ChevronLeft, ChevronRight, Database, FileText, Info, CheckCircle2, Download, Sparkles, X, Loader2, KeyRound, Eye, EyeOff, RotateCcw } from 'lucide-react';
+import { Search, FileJson, AlertCircle, ChevronLeft, ChevronRight, Database, FileText, Info, CheckCircle2, Download, Sparkles, X, Loader2, KeyRound, Eye, EyeOff, RotateCcw, Copy, ExternalLink, ChevronDown } from 'lucide-react';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } from 'docx';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas-pro';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -131,7 +134,11 @@ const DEFAULT_UI_LABELS = {
     relatedPrefix: '依據',
     caseCountSuffix: '筆案例',
     trendChartSuffix: 'TRL 年度趨勢',
-    trendInsufficientData: '此技術缺乏足夠的年度 TRL 資料，無法繪製趨勢'
+    trendInsufficientData: '此技術缺乏足夠的年度 TRL 資料，無法繪製趨勢',
+    countryBarHint: '點擊長條可查看該國家的相關案例',
+    countryListHeading: '相關案例',
+    countryListEmpty: '此國家沒有可連結的案例',
+    countryCaseHint: '點擊案例可跳轉至對應技術詳情'
   },
   en: {
     trlBarHint: 'Click a bar to see the technologies in that range',
@@ -143,7 +150,11 @@ const DEFAULT_UI_LABELS = {
     relatedPrefix: 'Based on',
     caseCountSuffix: 'cases',
     trendChartSuffix: 'TRL trend',
-    trendInsufficientData: 'Not enough yearly TRL data to plot a trend for this technology'
+    trendInsufficientData: 'Not enough yearly TRL data to plot a trend for this technology',
+    countryBarHint: 'Click a bar to see the cases from that country',
+    countryListHeading: 'Related cases',
+    countryListEmpty: 'No linkable cases for this country',
+    countryCaseHint: "Click a case to jump to its technology's details"
   }
 };
 
@@ -155,19 +166,25 @@ const MODAL_CHROME_LABELS = {
   zh: {
     title: 'AI 策略簡報預覽',
     subtitle: (n) => `共分析 ${n} 筆技術資料・點擊帶底線的技術名稱可查看詳情`,
-    download: '下載 PPTX',
+    download: '下載報告',
+    downloadWord: '下載為 Word (.docx)',
+    downloadPdf: '下載為 PDF (.pdf)',
     downloading: '生成中...',
     basicBadge: '基本統計',
     aiBadge: 'AI 洞察',
-    upgradeToAI: '升級為 AI 洞察',
+    upgradeToAI: '生成 AI 洞察報告',
     upgrading: 'AI 生成中...',
-    needApiKeyForUpgrade: '請先在右上角選擇 AI 供應商並輸入對應的 API 金鑰，才能升級為 AI 洞察。',
+    needApiKeyForUpgrade: '請先在右上角選擇 AI 供應商並輸入對應的 API 金鑰，才能生成 AI 洞察報告。',
     prevSlide: '上一頁',
     nextSlide: '下一頁',
     prevVersion: '上一版',
     nextVersion: '下一版',
     versionLabel: (i, n) => `版本 ${i} / ${n}`,
-    followUpPlaceholder: '追問調整這份簡報，例如：請更聚焦氫能 / 幫我用英文重寫',
+    focusTechPlaceholder: '選擇一項技術聚焦說明...',
+    focusTechButton: '聚焦此技術',
+    moreConciseButton: '整體更精簡',
+    rewriteOtherLangButton: '改用英文重寫',
+    followUpPlaceholder: '或自行輸入其他調整指示，例如：加強說明政策風險 / 補充跟氫能的關聯',
     revising: '調整中...',
     send: '送出',
     noPreview: '無法生成預覽，請重試'
@@ -175,19 +192,25 @@ const MODAL_CHROME_LABELS = {
   en: {
     title: 'AI Strategy Slide Preview',
     subtitle: (n) => `Analyzed ${n} technologies · click underlined tech names for details`,
-    download: 'Download PPTX',
+    download: 'Download Report',
+    downloadWord: 'Download as Word (.docx)',
+    downloadPdf: 'Download as PDF (.pdf)',
     downloading: 'Generating...',
     basicBadge: 'Basic Stats',
     aiBadge: 'AI Insights',
-    upgradeToAI: 'Upgrade to AI Insights',
+    upgradeToAI: 'Generate AI Insight Report',
     upgrading: 'Generating with AI...',
-    needApiKeyForUpgrade: 'Choose an AI provider and enter its API key in the top-right corner to upgrade to AI insights.',
+    needApiKeyForUpgrade: 'Choose an AI provider and enter its API key in the top-right corner to generate the AI insight report.',
     prevSlide: 'Previous',
     nextSlide: 'Next',
     prevVersion: 'Previous version',
     nextVersion: 'Next version',
     versionLabel: (i, n) => `Version ${i} / ${n}`,
-    followUpPlaceholder: 'Ask for a change, e.g. "Focus more on hydrogen" / "Rewrite in English"',
+    focusTechPlaceholder: 'Choose a technology to focus on...',
+    focusTechButton: 'Focus on this',
+    moreConciseButton: 'Make it more concise',
+    rewriteOtherLangButton: 'Rewrite in Traditional Chinese',
+    followUpPlaceholder: 'Or type another instruction, e.g. "Say more about policy risk" / "Add hydrogen linkages"',
     revising: 'Revising...',
     send: 'Send',
     noPreview: 'Could not generate a preview, please try again'
@@ -226,6 +249,10 @@ const APP_LABELS = {
     noResultsShort: '無結果',
     exportAll: '匯出所有完整資料',
     exportSingle: '匯出單一資料',
+    copyArticle: '複製 NotebookLM 文章格式',
+    copied: '已複製！',
+    openNotebookLM: '前往 NotebookLM',
+    copyArticleReminder: '複製後請記得手動貼到 NotebookLM 的「新增來源」中。',
     exportStrategyTitle: '匯出完整查詢結果',
     exportStrategyDescPrefix: '將目前符合條件的全部',
     exportStrategyDescSuffix: '筆技術資料匯出為 CSV 檔案。',
@@ -295,6 +322,10 @@ const APP_LABELS = {
     noResultsShort: 'No results',
     exportAll: 'Export all data',
     exportSingle: 'Export this item',
+    copyArticle: 'Copy NotebookLM article format',
+    copied: 'Copied!',
+    openNotebookLM: 'Open NotebookLM',
+    copyArticleReminder: 'After copying, remember to paste it into NotebookLM under "Add source".',
     exportStrategyTitle: 'Export Full Query Results',
     exportStrategyDescPrefix: 'Export all',
     exportStrategyDescSuffix: 'matching technologies as a CSV file.',
@@ -360,6 +391,42 @@ function countOccurrences(text, q) {
 function escapeCsv(val) {
   if (val === null || val === undefined) return '""';
   return `"${String(val).replace(/"/g, '""')}"`;
+}
+
+// Curated to exactly the fields the briefing report prompt actually reads
+// or cites — not every field on the object. Checked against the real
+// dataset before trimming: "theme"/"keyCountries"/the technology-level
+// "read_more" are empty on every one of the 639 cached technologies;
+// "description"/"NZErationale" are byte-for-byte duplicates of
+// technology_status_summary_en/market_dynamics_summary_en; those _en
+// summary fields themselves are never read by the prompt (it always
+// synthesizes from the _zh columns, regardless of output language); the
+// "sector" breadcrumb array duplicates sector_zh/sector_en; and the
+// trl_2020..trl_2025 per-year fields only feed the in-app trend chart, not
+// this report (which only cites latest_trl). Dropping all of those cuts the
+// prompt from ~25 columns to 10, with the biggest token savings coming from
+// removing four duplicate long-text summary columns. Still includes "_id"
+// as the first column (unlike the user-facing CSV export, which omits it)
+// since that's what lets report content stay traceable back to real
+// technology records, and the full "initiatives" array (serialized as JSON
+// per cell) so the report can cite real project names/figures instead of
+// inventing plausible-sounding ones.
+function buildFullDataCsv(techs) {
+  const allKeys = [
+    '_id', 'technology_name', 'technology_name_zh', 'sector_zh', 'sector_en',
+    'latest_trl', 'technology_status_summary_zh', 'market_dynamics_summary_zh',
+    'linked_records_count', 'initiatives'
+  ];
+  let csvContent = allKeys.map(key => escapeCsv(key)).join(",") + "\n";
+  techs.forEach(tech => {
+    const row = allKeys.map(key => {
+      let val = tech[key];
+      if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
+      return escapeCsv(val);
+    });
+    csvContent += row.join(",") + "\n";
+  });
+  return csvContent;
 }
 
 // Normalizes any of the accepted JSON shapes into a flat row array where every
@@ -473,69 +540,106 @@ function computeTechStats(techs) {
     if (bucket >= 0) { trlBreakdown[bucket].count++; trlBreakdown[bucket].techs.push({ id: r._id, name: techLabel(r) }); }
   });
 
-  const allInitiatives = techs.flatMap(r => r.initiatives || []);
-  const countryCounts = {};
-  allInitiatives.forEach(i => { if (i.country) countryCounts[i.country] = (countryCounts[i.country] || 0) + 1; });
-  const topCountries = Object.entries(countryCounts).sort((a, b) => b[1] - a[1]).map(c => c[0]);
+  // techId/techName carried on each initiative (not just the raw record)
+  // so slide3's country drill-down can list which case came from which
+  // technology and jump there — initiatives have no page of their own,
+  // the technology they're attached to is the only thing that's navigable.
+  const allInitiatives = techs.flatMap(r => (r.initiatives || []).map(init => ({ ...init, techId: r._id, techName: techLabel(r) })));
+  const countryGroups = {};
+  allInitiatives.forEach(i => {
+    if (!i.country) return;
+    (countryGroups[i.country] = countryGroups[i.country] || []).push(i);
+  });
+  // {name, count, initiatives} per country (not just a name) so slide3 can
+  // render an actual bar chart proportional to case volume, and drill down
+  // into the exact cases behind it — same shape/pattern as trlBreakdown's
+  // {stage, count, techs} above.
+  const topCountries = Object.entries(countryGroups)
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([name, initiatives]) => ({ name, count: initiatives.length, initiatives }));
 
   const topTechs = [...techs].sort((a, b) => (b.linked_records_count || 0) - (a.linked_records_count || 0));
 
   return { totalFound, topSector, trlBreakdown, allInitiatives, topCountries, topTechs };
 }
 
-// Scoped to exactly the two slides AI actually adds value on. slide1-4 are
-// deterministic aggregates (counts, rankings) already computed correctly by
-// buildFallbackAnalysis — asking the AI to redo them just produces the same
-// numbers in different words. This prompt instead pushes it to read the two
-// free-text columns (technology_status_summary_zh / market_dynamics_summary_zh)
-// and synthesize things counting literally cannot: recurring themes, risks,
-// and relationships across technologies.
-function buildTrendsAndRecommendationsPrompt(csvStr, uiLang = 'zh') {
+// Full document mode: an executive summary, a full overview table (one row
+// per matched technology), a dedicated deep-dive section for every single
+// matched technology (heading + intro + labeled sub-bullets, e.g. "技術特徵"
+// / "市場進展"), and a closing cross-technology trends section. Deliberately
+// no cap on how many tech_sections get generated — every matched technology
+// gets one, however many that is; the caller is expected to feed the full
+// per-technology field set (see buildFullDataCsv), including every linked
+// case record, not just the two summary paragraphs, so this can cite real
+// project names/capacities instead of inventing plausible-sounding ones.
+function buildBriefingReportPrompt(csvStr, uiLang = 'zh') {
   const languageInstruction = uiLang === 'en'
-    ? '整個平台目前設定為英文介面。請直接用英文輸出所有內容：slide5、slide6 的 title/subtitle/summary/points/recommendations，以及所有 "name" 顯示用技術名稱，全部都要是英文，不要輸出中文，也不需要使用者另外追問才翻譯。CSV 裡的 "_id" 仍必須照抄原始字串，不受語言影響。'
+    ? '整個平台目前設定為英文介面。請直接用英文輸出所有內容：report 底下每一個欄位（title、executive_summary、overview_table、tech_sections、trends_section 裡的所有文字），以及所有 "name" 顯示用技術名稱，全部都要是英文，不要輸出中文，也不需要使用者另外追問才翻譯。CSV 裡的 "_id" 仍必須照抄原始字串，不受語言影響。'
     : '請用繁體中文輸出所有內容。';
 
-  return `你是內建於「淨零碳排技術查詢平台」的策略分析引擎。以下 CSV 是本次查詢結果的技術清單。
+  return `你是內建於「淨零碳排技術查詢平台」的策略分析引擎。以下 CSV 是本次查詢結果的技術清單，每一列除了名稱、產業別、TRL、兩段摘要文字之外，"initiatives" 欄位是這項技術連結的完整案例清單（JSON 陣列，每筆案例可能包含年份、國家、類型、描述、來源連結），其餘欄位是原始資料庫裡的其他欄位。
 
-前四頁統計摘要（查詢總覽、技術成熟度分佈、專案活動熱區、關鍵技術清單）已經由本地程式正確算好，不需要你重做，也不在你的輸出範圍內。你的任務是仔細閱讀每一列的 "technology_status_summary_zh"（技術狀態摘要）與 "market_dynamics_summary_zh"（市場動態摘要）這兩欄文字內容，找出單靠數字統計看不出來的東西：多筆技術裡反覆出現的共通主題、風險或機會、技術之間可能的關聯性（互補或競爭）、容易被忽略但值得注意的異常或矛盾之處。不要只是重新條列 TRL 分佈或案例數量這類已經算過的統計數字，那不是你的任務。
+前四頁統計摘要（查詢總覽、技術成熟度分佈、專案活動熱區、關鍵技術清單）已經由本地程式正確算好，不需要你重做，也不在你的輸出範圍內。你的任務是撰寫一份完整、詳盡的「簡要報告」（briefing document），結構如下：
+
+1. **摘要（Executive Summary）**：開門見山，一段精簡但完整地點出本次查詢範圍內最關鍵的結論與重點。
+2. **技術現況總覽表**：針對 CSV 裡「每一項」技術，各生成一列，欄位為技術類別（名稱）、能源來源／技術原理（一句話）、TRL 等級、主要市場動態（一句話摘要）。這是表格，不是段落，每項技術都要有自己的一列，不可省略或合併。
+3. **核心技術深度分析**：針對 CSV 裡「每一項」技術，各生成一個獨立小節，包含：一段簡介（說明技術原理與定位）、以及依內容需要命名的子項目（例如「技術特徵」「市場進展」「發展限制」「關鍵動態」「挑戰」等，項目名稱依實際內容彈性決定，不必每項技術都用同樣的子項目名稱），子項目底下用條列方式呈現重點，盡量引用 "initiatives" 案例資料裡的具體專案名稱、地點、數字（容量、金額、年份等）作為佐證——只能使用 CSV 資料裡實際出現的具體數字與名稱，絕對不可自行編造。如果某項技術的案例或摘要資料很少，仍要盡力根據既有資料寫出簡要但真實的內容，不要跳過任何一項技術。
+4. **關鍵趨勢與戰略洞察**：綜合跨技術的觀察，依主題分成幾個子項目（例如「系統性效益」「經濟與環境價值」「商業化挑戰」等），每個子項目底下條列重點，並在提及具體技術時附上追溯依據。
+
+語氣必須客觀、犀利，不浮誇、不重述已經算好的統計數字（TRL 分佈、案例數量等），聚焦在單靠數字看不出來的洞察：技術之間的關聯性、風險、機會、容易被忽略但值得注意的異常或矛盾之處。
 
 ${languageInstruction}
 
-嚴格輸出 JSON 格式（不要包含任何 markdown 符號或說明文字，直接輸出純 JSON），只需要 slide5 與 slide6 兩個頂層欄位。CSV 第一欄 "_id" 是每項技術在資料庫中的唯一識別碼，"points"/"recommendations" 裡只要提到具體技術支持你的論點，就要在 "related_techs" 用 {"id": "...", "name": "..."} 的形式列出："id" 必須直接照抄 CSV 裡對應那一列的 "_id" 原始字串，絕對不可自行編造或省略；"name" 是顯示用的技術名稱。
+嚴格輸出 JSON 格式（不要包含任何 markdown 符號或說明文字，直接輸出純 JSON），只需要 "report" 這一個頂層欄位，結構完全比照下方【輸出格式】。CSV 第一欄 "_id" 是每項技術在資料庫中的唯一識別碼："overview_table.rows"、"tech_sections" 都要用 "id" 欄位照抄該技術在 CSV 裡對應的 "_id" 原始字串，絕對不可自行編造或省略；"trends_section" 裡提及具體技術支持論點時，也要在對應的 "related_techs" 用 {"id": "...", "name": "..."} 的形式列出，規則相同。
 
 【輸入資料】
 ${csvStr}
 
 【輸出格式】
 {
-  "slide5": {
-    "title": "趨勢、風險與關聯性",
-    "subtitle": "一句話說明本頁的分析角度",
-    "summary": "1-2句總體觀察",
-    "points": [
-      {"text": "具體洞察，引用摘要文字中的具體內容作為依據，不是重述統計數字", "related_techs": [{"id": "CSV裡的_id原值", "name": "技術名稱"}, "..."]},
-      {"text": "第二點洞察", "related_techs": [{"id": "CSV裡的_id原值", "name": "技術名稱"}, "..."]},
-      {"text": "第三點洞察", "related_techs": [{"id": "CSV裡的_id原值", "name": "技術名稱"}, "..."]}
-    ]
-  },
-  "slide6": {
-    "title": "綜合策略建議",
-    "subtitle": "基於前一頁的趨勢分析提出的行動方向",
-    "recommendations": [
-      {"text": "建議一：具體可行的策略建議，呼應 slide5 的某個洞察", "related_techs": [{"id": "CSV裡支持此建議的_id原值", "name": "技術名稱"}, "..."]},
-      {"text": "建議二：具體可行的策略建議", "related_techs": [{"id": "CSV裡支持此建議的_id原值", "name": "技術名稱"}, "..."]},
-      {"text": "建議三：具體可行的策略建議", "related_techs": [{"id": "CSV裡支持此建議的_id原值", "name": "技術名稱"}, "..."]}
-    ]
+  "report": {
+    "title": "簡要報告標題",
+    "executive_summary": "一段精簡但完整的摘要，開門見山列出最關鍵的結論，讓讀者一眼掌握重點",
+    "overview_table": {
+      "rows": [
+        {"id": "CSV裡的_id原值", "name": "技術名稱", "energy_source": "能源來源／技術原理，一句話", "trl": "TRL 等級", "market_dynamics": "主要市場動態，一句話摘要"},
+        "...CSV 裡每一項技術都要有一列，不可省略..."
+      ]
+    },
+    "tech_sections": [
+      {
+        "id": "CSV裡的_id原值",
+        "heading": "技術名稱",
+        "intro": "一段簡介，說明技術原理與定位",
+        "subsections": [
+          {"label": "依內容命名的子項目標題，例如：技術特徵", "bullets": ["具體重點一，盡量引用案例資料裡的真實數字與專案名稱", "具體重點二"]},
+          {"label": "依內容命名的子項目標題，例如：市場進展", "bullets": ["具體重點一", "具體重點二"]}
+        ]
+      },
+      "...CSV 裡每一項技術都要有自己的一個 tech_sections 項目，不可省略..."
+    ],
+    "trends_section": {
+      "heading": "關鍵趨勢與戰略洞察",
+      "subsections": [
+        {
+          "label": "子項目標題，例如：系統性效益",
+          "bullets": [
+            {"text": "具體洞察，引用資料中的具體內容作為依據", "related_techs": [{"id": "CSV裡的_id原值", "name": "技術名稱"}, "..."]}
+          ]
+        },
+        "...依內容可以有多個子項目，例如經濟與環境價值、商業化挑戰等..."
+      ]
+    }
   }
 }`;
 }
 
 // Produces only slide1-4 (overview / TRL / hotspots / top techs) — purely
 // computed from real data, so this is the "instant, no-wait" baseline every
-// strategy overview opens with. Recommendations used to live here as slide5,
-// but that's now exclusively an AI-generated addition (see
-// buildTrendsAndRecommendationsPrompt) so the two tiers are structurally
-// different, not just differently-worded restatements of the same stats.
+// strategy overview opens with. The narrative briefing report is exclusively
+// an AI-generated addition (see buildBriefingReportPrompt) so the two tiers
+// are structurally different, not just differently-worded restatements of
+// the same stats.
 function buildFallbackAnalysis(techs, uiLang = 'zh') {
   const { totalFound, topSector, trlBreakdown, allInitiatives, topCountries, topTechs } = computeTechStats(techs);
   const top5Countries = topCountries.slice(0, 5);
@@ -571,7 +675,7 @@ function buildFallbackAnalysis(techs, uiLang = 'zh') {
         title: "Project Activity Hotspots",
         subtitle: "Global geographic distribution",
         summary: `Key active regions identified from ${allInitiatives.length} cases, reflecting policy and market momentum.`,
-        countries: top5Countries.length > 0 ? top5Countries : ['Insufficient data']
+        countries: top5Countries
       },
       slide4: {
         title: "Key Technology List",
@@ -604,7 +708,7 @@ function buildFallbackAnalysis(techs, uiLang = 'zh') {
       title: "專案活動熱區",
       subtitle: "全球地理分佈",
       summary: `從 ${allInitiatives.length} 筆案例中識別出關鍵活躍地區，反映政策與市場推動力道。`,
-      countries: top5Countries.length > 0 ? top5Countries : ['資料不足']
+      countries: top5Countries
     },
     slide4: {
       title: "關鍵技術清單",
@@ -615,12 +719,328 @@ function buildFallbackAnalysis(techs, uiLang = 'zh') {
   };
 }
 
+// Same field set as the CSV export (every key on the tech object, not a
+// curated subset) — just laid out as a headed Markdown article instead of a
+// spreadsheet row, so tools like NotebookLM that read prose have enough
+// narrative context to work with. Shared by both the file-download export
+// and the clipboard-copy export.
+function buildArticleMarkdown(techs, uiLang = 'zh') {
+  const isEn = uiLang === 'en';
+  const nameOf = (tech) => (isEn ? (tech.technology_name || tech.technology_name_zh) : (tech.technology_name_zh || tech.technology_name)) || (isEn ? 'Unlabeled' : '未標示');
+  const structuredKeys = new Set([
+    'technology_name_zh', 'technology_name', 'sector_zh', 'sector_en',
+    'latest_trl', 'linked_records_count',
+    'technology_status_summary_zh', 'technology_status_summary_en',
+    'market_dynamics_summary_zh', 'market_dynamics_summary_en',
+    'initiatives', '_id', 'id'
+  ]);
+
+  const formatInitiatives = (initiatives) => {
+    if (!Array.isArray(initiatives) || initiatives.length === 0) {
+      return isEn ? '(No linked cases)' : '（無相關案例資料）';
+    }
+    return initiatives.map((init, i) => {
+      const meta = [init.year, init.country, init.type].filter(Boolean).join(' / ');
+      let line = `${i + 1}. ${meta ? `[${meta}] ` : ''}${init.description || (isEn ? 'Unlabeled' : '未標示')}`;
+      if (init.read_more) line += ` (${init.read_more})`;
+      return line;
+    }).join('\n');
+  };
+
+  let md = isEn ? `# IEA Net-Zero Technology Intelligence Platform — Full Export\n\n` : `# IEA 淨零技術智慧分析平台 — 完整匯出報告\n\n`;
+  md += isEn ? `Exported: ${new Date().toLocaleString('en-US')}\n` : `匯出時間：${new Date().toLocaleString('zh-TW')}\n`;
+  md += isEn ? `Technologies: ${techs.length}\n\n---\n\n` : `技術總數：${techs.length}\n\n---\n\n`;
+
+  techs.forEach((tech, idx) => {
+    md += `## ${idx + 1}. ${nameOf(tech)}\n\n`;
+    const altName = isEn ? tech.technology_name_zh : tech.technology_name;
+    if (altName) md += `*${altName}*\n\n`;
+    md += isEn
+      ? `- Sector: ${tech.sector_en || tech.sector_zh || 'Unlabeled'}\n- TRL: ${tech.latest_trl || 'Unlabeled'}\n- Related cases: ${tech.linked_records_count || 0}\n\n`
+      : `- 產業別：${tech.sector_zh || tech.sector_en || '未標示'}\n- TRL 等級：${tech.latest_trl || '未標示'}\n- 相關案例數：${tech.linked_records_count || 0}\n\n`;
+
+    const statusSummary = isEn
+      ? (tech.technology_status_summary_en || tech.technology_status_summary_zh)
+      : tech.technology_status_summary_zh;
+    if (statusSummary) md += `### ${isEn ? 'Technology Status Summary' : '技術現況摘要'}\n${statusSummary}\n\n`;
+
+    const marketSummary = isEn
+      ? (tech.market_dynamics_summary_en || tech.market_dynamics_summary_zh)
+      : tech.market_dynamics_summary_zh;
+    if (marketSummary) md += `### ${isEn ? 'Market Dynamics' : '市場動態'}\n${marketSummary}\n\n`;
+
+    // Every remaining field on the object, so nothing gets dropped
+    // relative to the CSV export's full column set.
+    const otherKeys = Object.keys(tech).filter(k => !structuredKeys.has(k));
+    if (otherKeys.length > 0) {
+      md += `### ${isEn ? 'Other Fields' : '其他欄位資料'}\n`;
+      otherKeys.forEach(key => {
+        let val = tech[key];
+        if (val === null || val === undefined || val === '') return;
+        if (typeof val === 'object') val = JSON.stringify(val);
+        md += `- **${key}**: ${val}\n`;
+      });
+      md += `\n`;
+    }
+
+    md += `### ${isEn ? 'Related Cases (Initiatives)' : '相關案例（Initiatives）'}\n${formatInitiatives(tech.initiatives)}\n\n---\n\n`;
+  });
+
+  return md;
+}
+
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Renders the report as a plain HTML string for the PDF export path. This
+// gets mounted off-screen and rasterized (see handleDownloadReportPdf)
+// rather than drawn with jsPDF's native text APIs, specifically to sidestep
+// jsPDF's lack of built-in Traditional Chinese glyph support — embedding a
+// CJK font in jsPDF requires converting a whole .ttf to base64 ahead of
+// time, which isn't practical here. Rasterizing whatever font the user's
+// own browser already renders Chinese with (the same one the on-screen UI
+// uses) sidesteps that entirely, at the cost of the PDF's text not being
+// selectable.
+function buildReportHtml(report, uiLang, techById, relatedPrefix) {
+  const isEn = uiLang === 'en';
+  let html = `<div style="font-family: 'Noto Sans TC', 'Noto Sans', sans-serif; color:#1e293b; padding:32px; width:800px; background:#ffffff;">`;
+  html += `<h1 style="font-size:26px; font-weight:800; margin:0 0 16px; color:#0f172a;">${escapeHtml(report.title || (isEn ? 'AI Insight Report' : 'AI 洞察報告'))}</h1>`;
+
+  if (report.executive_summary) {
+    html += `<div style="background:#eff6ff; border-left:4px solid #2563eb; padding:16px; margin-bottom:24px; border-radius:6px;">`;
+    html += `<div style="font-size:13px; font-weight:700; color:#2563eb; margin-bottom:4px;">${isEn ? 'Executive Summary' : '摘要'}</div>`;
+    html += `<div style="font-size:14px; line-height:1.7;">${escapeHtml(report.executive_summary)}</div>`;
+    html += `</div>`;
+  }
+
+  const tableRows = report.overview_table?.rows;
+  if (Array.isArray(tableRows) && tableRows.length > 0) {
+    html += `<h2 style="font-size:19px; font-weight:700; margin:24px 0 10px; color:#0f172a;">${isEn ? 'Technology Overview' : '技術現況總覽表'}</h2>`;
+    const headerLabels = isEn
+      ? ['Technology', 'Energy Source', 'TRL', 'Market Dynamics']
+      : ['技術類別', '能源來源', 'TRL', '主要市場動態'];
+    html += `<table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:16px;"><thead><tr>`;
+    html += headerLabels.map(h => `<th style="text-align:left; padding:6px 8px; background:#1f2937; color:#ffffff; border:1px solid #cbd5e1;">${escapeHtml(h)}</th>`).join('');
+    html += `</tr></thead><tbody>`;
+    tableRows.forEach(row => {
+      html += `<tr>`
+        + `<td style="padding:6px 8px; border:1px solid #e2e8f0; font-weight:600; vertical-align:top;">${escapeHtml(row.name)}</td>`
+        + `<td style="padding:6px 8px; border:1px solid #e2e8f0; vertical-align:top;">${escapeHtml(row.energy_source)}</td>`
+        + `<td style="padding:6px 8px; border:1px solid #e2e8f0; vertical-align:top; text-align:center;">${escapeHtml(row.trl)}</td>`
+        + `<td style="padding:6px 8px; border:1px solid #e2e8f0; vertical-align:top;">${escapeHtml(row.market_dynamics)}</td>`
+        + `</tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+
+  const techSections = report.tech_sections;
+  if (Array.isArray(techSections) && techSections.length > 0) {
+    html += `<h2 style="font-size:19px; font-weight:700; margin:24px 0 10px; color:#0f172a;">${isEn ? 'In-Depth Technology Analysis' : '核心技術深度分析'}</h2>`;
+    techSections.forEach((section, i) => {
+      html += `<h3 style="font-size:16px; font-weight:700; margin:16px 0 6px; color:#1e293b;">${i + 1}. ${escapeHtml(section.heading)}</h3>`;
+      if (section.intro) {
+        html += `<div style="font-size:13px; font-style:italic; color:#64748b; margin-bottom:8px; line-height:1.6;">${escapeHtml(section.intro)}</div>`;
+      }
+      (section.subsections || []).forEach(sub => {
+        html += `<div style="font-size:13px; font-weight:700; color:#475569; margin:10px 0 4px;">${escapeHtml(sub.label)}</div>`;
+        html += `<ul style="margin:0 0 8px; padding-left:20px;">`;
+        (sub.bullets || []).forEach(bullet => {
+          const text = typeof bullet === 'string' ? bullet : bullet.text;
+          html += `<li style="font-size:13px; line-height:1.6; margin-bottom:4px;">${escapeHtml(text)}</li>`;
+        });
+        html += `</ul>`;
+      });
+    });
+  }
+
+  if (report.trends_section) {
+    html += `<h2 style="font-size:19px; font-weight:700; margin:24px 0 10px; color:#0f172a;">${escapeHtml(report.trends_section.heading || (isEn ? 'Key Trends & Strategic Insights' : '關鍵趨勢與戰略洞察'))}</h2>`;
+    (report.trends_section.subsections || []).forEach(sub => {
+      html += `<div style="font-size:13px; font-weight:700; color:#475569; margin:10px 0 4px;">${escapeHtml(sub.label)}</div>`;
+      html += `<ul style="margin:0 0 8px; padding-left:20px;">`;
+      (sub.bullets || []).forEach(bullet => {
+        const text = typeof bullet === 'string' ? bullet : bullet.text;
+        const relatedTechs = (typeof bullet === 'string' ? [] : (bullet.related_techs || [])).filter(t => techById.has(t.id));
+        const relatedNames = relatedTechs.map(t => t.name);
+        let line = escapeHtml(text);
+        if (relatedNames.length > 0) {
+          const separator = isEn ? ': ' : '：';
+          const joiner = isEn ? ', ' : '、';
+          line += ` <span style="font-style:italic; color:#94a3b8;">(${escapeHtml(relatedPrefix)}${escapeHtml(separator)}${escapeHtml(relatedNames.join(joiner))})</span>`;
+        }
+        html += `<li style="font-size:13px; line-height:1.6; margin-bottom:4px;">${line}</li>`;
+      });
+      html += `</ul>`;
+    });
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// Shared by both the AI-report PDF export and the no-AI-needed stats-only
+// PDF export below: mounts an HTML string off-screen, rasterizes it
+// (html2canvas), and slices it across as many A4 pages as needed. Page
+// breaks are computed from real element positions (getBoundingClientRect,
+// not offsetTop — table rows can become their own offsetParent, which
+// throws off offsetTop-based math), so a break only ever lands in the
+// whitespace gap between two blocks/table rows/list items, never through
+// the middle of one — a naive fixed-height slice cut text off mid-line
+// whenever a line happened to straddle a page boundary.
+async function renderHtmlToPdf(html, filename) {
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-99999px';
+  container.style.top = '0';
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  try {
+    // reportRoot is the single outer <div> buildReportHtml wraps everything
+    // in. Table rows and list items get expanded into their own breakable
+    // units, since either can independently grow past a page's height as
+    // the number of matched technologies grows.
+    const reportRoot = container.firstElementChild;
+    const collectUnits = (root) => {
+      const units = [];
+      Array.from(root.children).forEach(child => {
+        if (child.tagName === 'TABLE') {
+          const rows = Array.from(child.querySelectorAll('tr'));
+          (rows.length > 0 ? rows : [child]).forEach(row => units.push(row));
+        } else if (child.tagName === 'UL' || child.tagName === 'OL') {
+          const items = Array.from(child.children);
+          (items.length > 0 ? items : [child]).forEach(item => units.push(item));
+        } else {
+          units.push(child);
+        }
+      });
+      return units;
+    };
+    const units = collectUnits(reportRoot);
+    const rootRect = reportRoot.getBoundingClientRect();
+    const unitPositions = units.map(u => {
+      const r = u.getBoundingClientRect();
+      return { top: r.top - rootRect.top, bottom: r.bottom - rootRect.top };
+    });
+    const contentWidthPx = reportRoot.offsetWidth;
+    const totalHeightPx = rootRect.height;
+
+    const canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff' });
+    const scaleFactor = canvas.width / contentWidthPx;
+
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+    const pageWidthMm = pdf.internal.pageSize.getWidth();
+    const pageHeightMm = pdf.internal.pageSize.getHeight();
+    const marginMm = 10;
+    const usableHeightMm = pageHeightMm - marginMm * 2;
+    const imgWidthMm = pageWidthMm;
+    const pxToMm = imgWidthMm / contentWidthPx;
+    const usableHeightPx = usableHeightMm / pxToMm;
+
+    // Greedily pack units onto pages: whenever the next unit would push
+    // the running page past its height budget, break before that unit
+    // instead of mid-way through it.
+    const breakpointsPx = [0];
+    let pageStart = 0;
+    unitPositions.forEach(pos => {
+      if (pos.bottom - pageStart > usableHeightPx && pos.top > pageStart) {
+        breakpointsPx.push(pos.top);
+        pageStart = pos.top;
+      }
+    });
+    breakpointsPx.push(totalHeightPx);
+
+    for (let p = 0; p < breakpointsPx.length - 1; p++) {
+      const sliceTopPx = breakpointsPx[p] * scaleFactor;
+      const sliceBottomPx = breakpointsPx[p + 1] * scaleFactor;
+      const sliceHeightPx = sliceBottomPx - sliceTopPx;
+      if (sliceHeightPx <= 0) continue;
+
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = canvas.width;
+      sliceCanvas.height = sliceHeightPx;
+      const ctx = sliceCanvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+      ctx.drawImage(canvas, 0, sliceTopPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+
+      const sliceHeightMm = (sliceHeightPx / scaleFactor) * pxToMm;
+      if (p > 0) pdf.addPage();
+      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, marginMm, imgWidthMm, sliceHeightMm);
+    }
+
+    pdf.save(filename);
+  } finally {
+    if (container.parentNode) container.parentNode.removeChild(container);
+  }
+}
+
+// Shared tail of both docx download handlers — packs a docx Document into
+// a blob and triggers a browser download for it.
+async function downloadDocxBlob(doc, filename) {
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// Shared by the AI-report download in the modal header below — button+menu
+// shape factored out on its own in case another download control needs it.
+function DownloadDropdown({ label, isDownloading, downloadingLabel, wordLabel, pdfLabel, onWord, onPdf, open, onToggle, onClose }) {
+  return (
+    <div className="relative">
+      <button
+        onClick={onToggle}
+        disabled={isDownloading}
+        className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+      >
+        {isDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+        {isDownloading ? downloadingLabel : label}
+        {!isDownloading && <ChevronDown size={14} />}
+      </button>
+      {open && !isDownloading && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={onClose} />
+          <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20">
+            <button
+              onClick={() => { onClose(); onWord(); }}
+              className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              {wordLabel}
+            </button>
+            <button
+              onClick={() => { onClose(); onPdf(); }}
+              className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              {pdfLabel}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── AI Analysis Modal ──────────────────────────────────────────────────────
 
-function AIAnalysisModal({ geminiData, isAI, isUpgrading, hasApiKey, onUpgrade, onClose, onDownload, isDownloading, totalMatches, techById, onJumpToTech, isRevising, onRefine, versionCount, versionIndex, onGoToVersion, uiLang }) {
+function AIAnalysisModal({ geminiData, isAI, isUpgrading, hasApiKey, onUpgrade, onClose, onDownloadWord, onDownloadPdf, isDownloading, totalMatches, techById, onJumpToTech, isRevising, onRefine, versionCount, versionIndex, onGoToVersion, uiLang, analysisTechs }) {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [focusTechId, setFocusTechId] = useState('');
   const [followUpText, setFollowUpText] = useState('');
   const t = MODAL_CHROME_LABELS[uiLang];
+
+  const techDisplayName = (tech) => (uiLang === 'en' ? (tech.technology_name || tech.technology_name_zh) : (tech.technology_name_zh || tech.technology_name));
 
   const submitFollowUp = () => {
     if (!followUpText.trim() || isRevising) return;
@@ -628,18 +1048,45 @@ function AIAnalysisModal({ geminiData, isAI, isUpgrading, hasApiKey, onUpgrade, 
     setFollowUpText('');
   };
 
+  // Guided quick-actions for the common cases (each sends a fully-formed
+  // instruction straight to onRefine) sit alongside the free-text box below
+  // rather than replacing it — the buttons cover the common cases without
+  // typing, but anything more specific still needs the open input.
+  const handleMoreConcise = () => {
+    if (isRevising) return;
+    onRefine(uiLang === 'en'
+      ? 'Keep the same overall section structure, but make the whole report more concise — trim less-essential detail.'
+      : '請將整份報告維持相同的章節結構，但內容寫得更精簡扼要，去除較次要的細節。');
+  };
+
+  const handleRewriteOtherLanguage = () => {
+    if (isRevising) return;
+    onRefine(uiLang === 'en'
+      ? '請將整份報告改用繁體中文重寫，其餘結構保持不變。'
+      : 'Please rewrite the whole report in English, keeping the same overall section structure.');
+  };
+
+  const handleFocusTech = () => {
+    if (!focusTechId || isRevising) return;
+    const tech = (analysisTechs || []).find(t2 => t2._id === focusTechId);
+    if (!tech) return;
+    const name = techDisplayName(tech);
+    onRefine(uiLang === 'en'
+      ? `Focus more deeply on "${name}" — give it a more thorough analysis, and you can shorten the coverage of the other technologies. Keep the same overall section structure.`
+      : `請更聚焦在「${name}」，針對這項技術做更深入的分析與說明，其他技術的內容可以精簡帶過，但整體章節結構維持不變。`);
+  };
+
   const slides = geminiData ? [
     geminiData.slide1,
     geminiData.slide2,
     geminiData.slide3,
     geminiData.slide4,
-    geminiData.slide5,
-    geminiData.slide6,
+    geminiData.report,
   ].filter(Boolean) : [];
 
   const slideCount = slides.length || 4;
 
-  const slideColors = ['#2563EB', '#059669', '#7C3AED', '#D97706', '#0D9488', '#DC2626'];
+  const slideColors = ['#2563EB', '#059669', '#7C3AED', '#D97706', '#0D9488'];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
@@ -654,25 +1101,34 @@ function AIAnalysisModal({ geminiData, isAI, isUpgrading, hasApiKey, onUpgrade, 
               <Sparkles size={16} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 {t.title}
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${isAI ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${isAI ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>
                   {isAI ? t.aiBadge : t.basicBadge}
                 </span>
               </h2>
-              <p className="text-xs text-slate-500">{t.subtitle(totalMatches)}</p>
+              <p className="text-sm text-slate-500">{t.subtitle(totalMatches)}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {geminiData && (
-              <button
-                onClick={onDownload}
-                disabled={isDownloading}
-                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-              >
-                {isDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                {isDownloading ? t.downloading : t.download}
-              </button>
+            {/* Only shown while actually viewing the report page itself —
+                the download always exports the report regardless of which
+                slide the export/download button was clicked from, so
+                showing it while browsing the rule-based slide1-4 stats
+                would wrongly imply those pages are downloadable too. */}
+            {geminiData?.report && currentSlide === slides.length - 1 && (
+              <DownloadDropdown
+                label={t.download}
+                isDownloading={isDownloading}
+                downloadingLabel={t.downloading}
+                wordLabel={t.downloadWord}
+                pdfLabel={t.downloadPdf}
+                onWord={onDownloadWord}
+                onPdf={onDownloadPdf}
+                open={showDownloadMenu}
+                onToggle={() => setShowDownloadMenu(v => !v)}
+                onClose={() => setShowDownloadMenu(false)}
+              />
             )}
             <button
               onClick={onClose}
@@ -697,7 +1153,7 @@ function AIAnalysisModal({ geminiData, isAI, isUpgrading, hasApiKey, onUpgrade, 
                 <button
                   disabled={currentSlide === 0}
                   onClick={() => setCurrentSlide(p => Math.max(0, p - 1))}
-                  className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors"
+                  className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors"
                 >
                   <ChevronLeft size={14} /> {t.prevSlide}
                 </button>
@@ -718,7 +1174,7 @@ function AIAnalysisModal({ geminiData, isAI, isUpgrading, hasApiKey, onUpgrade, 
                 <button
                   disabled={currentSlide === slides.length - 1}
                   onClick={() => setCurrentSlide(p => Math.min(slides.length - 1, p + 1))}
-                  className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors"
+                  className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors"
                 >
                   {t.nextSlide} <ChevronRight size={14} />
                 </button>
@@ -742,7 +1198,7 @@ function AIAnalysisModal({ geminiData, isAI, isUpgrading, hasApiKey, onUpgrade, 
                         >
                           <ChevronLeft size={16} />
                         </button>
-                        <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                        <span className="text-sm text-slate-500 font-medium flex items-center gap-1.5">
                           <RotateCcw size={12} /> {t.versionLabel(versionIndex + 1, versionCount)}
                         </span>
                         <button
@@ -755,24 +1211,63 @@ function AIAnalysisModal({ geminiData, isAI, isUpgrading, hasApiKey, onUpgrade, 
                         </button>
                       </div>
                     )}
-                    <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={followUpText}
-                      onChange={e => setFollowUpText(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') submitFollowUp(); }}
-                      placeholder={t.followUpPlaceholder}
-                      disabled={isRevising}
-                      className="flex-1 text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:bg-slate-100"
-                    />
-                    <button
-                      onClick={submitFollowUp}
-                      disabled={isRevising || !followUpText.trim()}
-                      className="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-all flex-shrink-0"
-                    >
-                      {isRevising ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                      {isRevising ? t.revising : t.send}
-                    </button>
+                    <div className="space-y-2">
+                      <div className="flex gap-2 items-center">
+                        <select
+                          value={focusTechId}
+                          onChange={e => setFocusTechId(e.target.value)}
+                          disabled={isRevising || !analysisTechs || analysisTechs.length === 0}
+                          className="flex-1 text-base px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:bg-slate-100 bg-white"
+                        >
+                          <option value="">{t.focusTechPlaceholder}</option>
+                          {(analysisTechs || []).map(tech => (
+                            <option key={tech._id} value={tech._id}>{techDisplayName(tech)}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={handleFocusTech}
+                          disabled={isRevising || !focusTechId}
+                          className="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white text-base font-medium px-4 py-2 rounded-lg transition-all flex-shrink-0"
+                        >
+                          {isRevising ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                          {isRevising ? t.revising : t.focusTechButton}
+                        </button>
+                      </div>
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          onClick={handleMoreConcise}
+                          disabled={isRevising}
+                          className="text-sm font-medium px-3 py-1.5 rounded-full border border-purple-300 text-purple-700 bg-white hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {t.moreConciseButton}
+                        </button>
+                        <button
+                          onClick={handleRewriteOtherLanguage}
+                          disabled={isRevising}
+                          className="text-sm font-medium px-3 py-1.5 rounded-full border border-purple-300 text-purple-700 bg-white hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {t.rewriteOtherLangButton}
+                        </button>
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={followUpText}
+                          onChange={e => setFollowUpText(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') submitFollowUp(); }}
+                          placeholder={t.followUpPlaceholder}
+                          disabled={isRevising}
+                          className="flex-1 text-base px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:bg-slate-100"
+                        />
+                        <button
+                          onClick={submitFollowUp}
+                          disabled={isRevising || !followUpText.trim()}
+                          className="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white text-base font-medium px-4 py-2 rounded-lg transition-all flex-shrink-0"
+                        >
+                          {isRevising ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                          {isRevising ? t.revising : t.send}
+                        </button>
+                      </div>
                     </div>
                   </>
                 ) : hasApiKey ? (
@@ -780,19 +1275,19 @@ function AIAnalysisModal({ geminiData, isAI, isUpgrading, hasApiKey, onUpgrade, 
                     <button
                       onClick={onUpgrade}
                       disabled={isUpgrading}
-                      className="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-all"
+                      className="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white text-base font-medium px-4 py-2 rounded-lg transition-all"
                     >
                       {isUpgrading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                       {isUpgrading ? t.upgrading : t.upgradeToAI}
                     </button>
                   </div>
                 ) : (
-                  <p className="text-xs text-amber-600 text-center">{t.needApiKeyForUpgrade}</p>
+                  <p className="text-sm text-amber-600 text-center">{t.needApiKeyForUpgrade}</p>
                 )}
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+            <div className="flex-1 flex items-center justify-center text-slate-400 text-base">
               {t.noPreview}
             </div>
           )}
@@ -807,24 +1302,33 @@ function AIAnalysisModal({ geminiData, isAI, isUpgrading, hasApiKey, onUpgrade, 
 function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJumpToTech, uiLabels, uiLang }) {
   const [expandedTrlBucket, setExpandedTrlBucket] = useState(null);
   const [trendTechId, setTrendTechId] = useState(null);
+  const [expandedCountry, setExpandedCountry] = useState(null);
   const labels = { ...DEFAULT_UI_LABELS[uiLang || 'zh'], ...(uiLabels || {}) };
 
-  // Drilling into a TRL bucket only makes sense on the slide you drilled into.
+  // Drilling into a TRL bucket/country only makes sense on the slide you
+  // drilled into.
   useEffect(() => {
     setExpandedTrlBucket(null);
     setTrendTechId(null);
+    setExpandedCountry(null);
   }, [index]);
 
   if (!slide) return null;
 
-  const titles = ['查詢總覽', '技術成熟度分析', '專案活動熱區', '關鍵技術清單', '趨勢、風險與關聯性', '綜合策略建議'];
-  const icons = ['📊', '🔬', '🌍', '🏆', '🔍', '💡'];
+  const titles = ['查詢總覽', '技術成熟度分析', '專案活動熱區', '關鍵技術清單', '簡要報告'];
+  const icons = ['📊', '🔬', '🌍', '🏆', '📝'];
 
   const activeBucket = slide.trl_breakdown && expandedTrlBucket !== null ? slide.trl_breakdown[expandedTrlBucket] : null;
   // Display name comes from Gemini's own "techs" field (so it follows
   // whatever language/rewrite the user asked for) — id still resolves the
   // real record for navigation/trend-chart data, which can't be translated.
   const activeBucketTechs = activeBucket ? (activeBucket.techs || []).filter(t => techById?.has(t.id)) : [];
+
+  // Same drill-down pattern as the TRL bucket above — click a country bar
+  // to reveal the cases behind it, same {name, count, initiatives} shape
+  // computeTechStats produces.
+  const activeCountry = slide.countries && expandedCountry !== null ? slide.countries[expandedCountry] : null;
+  const activeCountryInitiatives = activeCountry ? (activeCountry.initiatives || []).filter(i => techById?.has(i.techId)) : [];
 
   return (
     <>
@@ -836,32 +1340,32 @@ function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJump
       <div style={{ height: '6px', background: accentColor, width: '100%', borderRadius: '12px 12px 0 0' }} />
 
       {/* No fixed height / overflow-hidden here anymore — a hard-clipped
-          16:9 box kept cutting off slide2/slide5 whenever their content
-          (TRL drill-down, longer recommendations + reference chips) grew
-          past a "real slide" size. The card now just grows with its
+          16:9 box kept cutting off slide2/the report slide whenever their
+          content (TRL drill-down, longer report sections + reference chips)
+          grew past a "real slide" size. The card now just grows with its
           content, and the modal's own overflow-auto wrapper scrolls it. */}
       <div className="p-8 flex flex-col">
         {/* Slide number badge */}
         <div className="flex items-start justify-between mb-5">
           <div>
             <div
-              className="text-xs font-bold px-2 py-0.5 rounded-full inline-block mb-2"
+              className="text-sm font-bold px-2 py-0.5 rounded-full inline-block mb-2"
               style={{ background: accentColor + '18', color: accentColor }}
             >
               第 {index + 1} / {totalSlides || 4} 頁
             </div>
             <h2
-              className="text-2xl font-bold text-slate-900 leading-tight"
+              className="text-3xl font-bold text-slate-900 leading-tight"
             >
               {icons[index]} {slide.title || titles[index]}
             </h2>
             {slide.subtitle && (
-              <p className="text-sm text-slate-500 mt-1">{slide.subtitle}</p>
+              <p className="text-base text-slate-500 mt-1">{slide.subtitle}</p>
             )}
           </div>
           <div className="text-right flex-shrink-0">
-            <div className="text-xs text-slate-300 font-mono">IEA NET ZERO</div>
-            <div className="text-[10px] text-slate-300 mt-0.5 whitespace-nowrap">AI Generated · {new Date().getFullYear()}</div>
+            <div className="text-sm text-slate-300 font-mono">IEA NET ZERO</div>
+            <div className="text-xs text-slate-300 mt-0.5 whitespace-nowrap">AI Generated · {new Date().getFullYear()}</div>
           </div>
         </div>
 
@@ -873,7 +1377,7 @@ function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJump
           {/* Main content */}
           <div className="flex-1 min-w-0">
             {slide.summary && (
-              <p className="text-sm text-slate-700 leading-relaxed mb-4">{slide.summary}</p>
+              <p className="text-base text-slate-700 leading-relaxed mb-4">{slide.summary}</p>
             )}
 
             {/* KPIs (slide 1) */}
@@ -881,49 +1385,11 @@ function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJump
               <div className="grid grid-cols-3 gap-3 mt-2">
                 {slide.kpis.map((kpi, i) => (
                   <div key={i} className="rounded-lg p-3 border" style={{ borderColor: accentColor + '30', background: accentColor + '08' }}>
-                    <div className="text-xl font-black" style={{ color: accentColor }}>{kpi.value}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{kpi.label}</div>
+                    <div className="text-2xl font-black" style={{ color: accentColor }}>{kpi.value}</div>
+                    <div className="text-sm text-slate-500 mt-0.5">{kpi.label}</div>
                   </div>
                 ))}
               </div>
-            )}
-
-            {/* Bullet points (slide 5: trends/risks/correlations) — same
-                {text, related_techs} shape as recommendations below, just a
-                lighter bulleted style since these are observations, not
-                action items. Falls back to a plain string for safety if a
-                point ever arrives un-objectified. */}
-            {slide.points && Array.isArray(slide.points) && (
-              <ul className="space-y-2.5">
-                {slide.points.map((point, i) => {
-                  const text = typeof point === 'string' ? point : point.text;
-                  const relatedTechs = ((typeof point === 'string' ? [] : point.related_techs) || []).filter(t => techById?.has(t.id));
-                  return (
-                    <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                      <span style={{ color: accentColor, marginTop: '2px', flexShrink: 0 }}>▸</span>
-                      <div className="flex-1">
-                        <span className="leading-relaxed">{text}</span>
-                        {relatedTechs.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mt-1.5">
-                            {relatedTechs.map(t => (
-                              <button
-                                key={t.id}
-                                type="button"
-                                onClick={() => onJumpToTech(t.id)}
-                                title={uiLang === 'en' ? 'Click to view details' : '點擊查看此技術詳情'}
-                                className="text-[11px] px-2 py-0.5 rounded-full font-medium transition-colors hover:brightness-95"
-                                style={{ background: '#fff', color: accentColor, border: `1px solid ${accentColor}40` }}
-                              >
-                                {labels.relatedPrefix}{uiLang === 'en' ? ': ' : '：'}{t.name}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
             )}
 
             {/* TRL breakdown (slide 2) — bars only; drill-down list & trend
@@ -942,36 +1408,60 @@ function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJump
                       disabled={item.count === 0}
                       className={`w-full flex items-center gap-3 text-left disabled:cursor-default rounded-lg -mx-1 px-1 py-0.5 transition-colors ${isActive ? 'bg-slate-50' : ''}`}
                     >
-                      <div className="text-xs w-28 flex-shrink-0" style={{ color: isActive ? accentColor : '#64748b', fontWeight: isActive ? 700 : 400 }}>{item.stage}</div>
+                      <div className="text-sm w-28 flex-shrink-0" style={{ color: isActive ? accentColor : '#64748b', fontWeight: isActive ? 700 : 400 }}>{item.stage}</div>
                       <div className="flex-1 h-5 rounded-full bg-slate-100 overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-700"
                           style={{ width: `${Math.min(100, (item.count / (slide.total || 1)) * 100)}%`, background: item.count > 0 ? accentColor : accentColor + '80' }}
                         />
                       </div>
-                      <div className="text-xs font-bold text-slate-700 w-8 text-right">{item.count}</div>
+                      <div className="text-sm font-bold text-slate-700 w-8 text-right">{item.count}</div>
                     </button>
                   );
                 })}
                 {slide.trl_breakdown.some(b => b.count > 0) && (
-                  <p className="text-[11px] text-slate-400 pt-1">{labels.trlBarHint}</p>
+                  <p className="text-xs text-slate-400 pt-1">{labels.trlBarHint}</p>
                 )}
               </div>
             )}
 
-            {/* Countries (slide 3) */}
+            {/* Countries (slide 3) — bar chart proportional to case count,
+                same visual language and click-to-drill-down pattern as the
+                TRL bars above; drill-down list & jump-to-tech render in a
+                separate panel below the slide (see return), same reason
+                the TRL drill-down does. */}
             {slide.countries && Array.isArray(slide.countries) && (
-              <div className="flex flex-wrap gap-2">
-                {slide.countries.map((c, i) => (
-                  <span
-                    key={i}
-                    className="text-xs px-2.5 py-1 rounded-full font-medium"
-                    style={{ background: accentColor + '15', color: accentColor, border: `1px solid ${accentColor}30` }}
-                  >
-                    {c}
-                  </span>
-                ))}
-              </div>
+              slide.countries.length === 0 ? (
+                <p className="text-sm text-slate-400">{uiLang === 'en' ? 'Not enough case data to identify hotspots.' : '案例資料不足，無法識別活躍地區。'}</p>
+              ) : (() => {
+                const maxCount = Math.max(...slide.countries.map(x => x.count || 0), 1);
+                return (
+                  <div className="space-y-2">
+                    {slide.countries.map((c, i) => {
+                      const isActive = expandedCountry === i;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => { setExpandedCountry(isActive ? null : i); }}
+                          disabled={!c.count}
+                          className={`w-full flex items-center gap-3 text-left disabled:cursor-default rounded-lg -mx-1 px-1 py-0.5 transition-colors ${isActive ? 'bg-slate-50' : ''}`}
+                        >
+                          <div className="text-sm w-28 flex-shrink-0 truncate" style={{ color: isActive ? accentColor : '#64748b', fontWeight: isActive ? 700 : 400 }}>{c.name}</div>
+                          <div className="flex-1 h-5 rounded-full bg-slate-100 overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-700"
+                              style={{ width: `${Math.min(100, (c.count / maxCount) * 100)}%`, background: accentColor }}
+                            />
+                          </div>
+                          <div className="text-sm font-bold text-slate-700 w-8 text-right">{c.count}</div>
+                        </button>
+                      );
+                    })}
+                    <p className="text-xs text-slate-400 pt-1">{labels.countryBarHint}</p>
+                  </div>
+                );
+              })()
             )}
 
             {/* Ranked list (slide 4) */}
@@ -986,16 +1476,16 @@ function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJump
                         onClick={jumpable ? () => onJumpToTech(tech.id) : undefined}
                         disabled={!jumpable}
                         title={jumpable ? (uiLang === 'en' ? 'Click to view details' : '點擊查看此技術詳情') : undefined}
-                        className={`w-full flex items-center gap-3 text-sm text-left rounded-lg -mx-1 px-1 py-0.5 transition-colors ${jumpable ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}
+                        className={`w-full flex items-center gap-3 text-base text-left rounded-lg -mx-1 px-1 py-0.5 transition-colors ${jumpable ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}
                       >
                         <span
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 text-white"
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 text-white"
                           style={{ background: accentColor }}
                         >
                           {i + 1}
                         </span>
                         <span className={`text-slate-800 font-medium flex-1 truncate ${jumpable ? 'underline decoration-dotted underline-offset-2' : ''}`}>{tech.name}</span>
-                        <span className="text-xs text-slate-400">{tech.count} {labels.caseCountSuffix}</span>
+                        <span className="text-sm text-slate-400">{tech.count} {labels.caseCountSuffix}</span>
                       </button>
                     </li>
                   );
@@ -1003,41 +1493,128 @@ function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJump
               </ol>
             )}
 
-            {/* Recommendations (slide 6) */}
-            {slide.recommendations && Array.isArray(slide.recommendations) && (
-              <div className="space-y-2.5">
-                {slide.recommendations.map((rec, i) => {
-                  const text = typeof rec === 'string' ? rec : rec.text;
-                  // Display name comes from Gemini's own "related_techs" field
-                  // (follows whatever language/rewrite was asked for); id
-                  // still has to resolve a real record to stay clickable.
-                  const relatedTechs = ((typeof rec === 'string' ? [] : rec.related_techs) || []).filter(t => techById?.has(t.id));
+            {/* Briefing report (slide "report") — a NotebookLM-style briefing
+                document: executive summary, a full one-row-per-technology
+                overview table, a deep-dive section for every matched
+                technology, and a closing cross-technology trends section. */}
+            {slide.executive_summary && (
+              <div
+                className="rounded-lg p-4 mb-5 text-base text-slate-700 leading-relaxed"
+                style={{ background: accentColor + '0c', borderLeft: `3px solid ${accentColor}` }}
+              >
+                <div className="text-sm font-bold mb-1" style={{ color: accentColor }}>
+                  {uiLang === 'en' ? 'Executive Summary' : '摘要'}
+                </div>
+                <p>{slide.executive_summary}</p>
+              </div>
+            )}
+
+            {slide.overview_table?.rows?.length > 0 && (
+              <div className="mb-6 overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b-2" style={{ borderColor: accentColor }}>
+                      <th className="text-left py-2 pr-3 font-bold text-slate-700">{uiLang === 'en' ? 'Technology' : '技術類別'}</th>
+                      <th className="text-left py-2 pr-3 font-bold text-slate-700">{uiLang === 'en' ? 'Energy Source' : '能源來源'}</th>
+                      <th className="text-left py-2 pr-3 font-bold text-slate-700">TRL</th>
+                      <th className="text-left py-2 font-bold text-slate-700">{uiLang === 'en' ? 'Market Dynamics' : '主要市場動態'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {slide.overview_table.rows.map((row, i) => {
+                      const jumpable = !!(row.id && techById?.has(row.id) && onJumpToTech);
+                      return (
+                        <tr key={i} className="border-b border-slate-100 align-top">
+                          <td className="py-2 pr-3 font-medium text-slate-800">
+                            {jumpable ? (
+                              <button type="button" onClick={() => onJumpToTech(row.id)} title={uiLang === 'en' ? 'Click to view details' : '點擊查看此技術詳情'} className="text-left underline decoration-dotted underline-offset-2 hover:brightness-90" style={{ color: accentColor }}>
+                                {row.name}
+                              </button>
+                            ) : row.name}
+                          </td>
+                          <td className="py-2 pr-3 text-slate-600">{row.energy_source}</td>
+                          <td className="py-2 pr-3 text-slate-600 whitespace-nowrap">{row.trl}</td>
+                          <td className="py-2 text-slate-600">{row.market_dynamics}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {slide.tech_sections && Array.isArray(slide.tech_sections) && slide.tech_sections.length > 0 && (
+              <div className="space-y-6 mb-6">
+                {slide.tech_sections.map((section, i) => {
+                  const jumpable = !!(section.id && techById?.has(section.id) && onJumpToTech);
                   return (
-                    <div
-                      key={i}
-                      className="rounded-lg p-3 text-sm text-slate-700 leading-relaxed"
-                      style={{ background: accentColor + '08', borderLeft: `3px solid ${accentColor}` }}
-                    >
-                      <p>{text}</p>
-                      {relatedTechs.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {relatedTechs.map(t => (
-                            <button
-                              key={t.id}
-                              type="button"
-                              onClick={() => onJumpToTech(t.id)}
-                              title={uiLang === 'en' ? 'Click to view details' : '點擊查看此技術詳情'}
-                              className="text-[11px] px-2 py-0.5 rounded-full font-medium transition-colors hover:brightness-95"
-                              style={{ background: '#fff', color: accentColor, border: `1px solid ${accentColor}40` }}
-                            >
-                              {labels.relatedPrefix}{uiLang === 'en' ? ': ' : '：'}{t.name}
-                            </button>
-                          ))}
+                    <div key={i}>
+                      <h3 className="text-lg font-bold text-slate-800 mb-1">
+                        {i + 1}.{' '}
+                        {jumpable ? (
+                          <button type="button" onClick={() => onJumpToTech(section.id)} title={uiLang === 'en' ? 'Click to view details' : '點擊查看此技術詳情'} className="underline decoration-dotted underline-offset-2 hover:brightness-90">
+                            {section.heading}
+                          </button>
+                        ) : section.heading}
+                      </h3>
+                      {section.intro && <p className="text-base text-slate-700 leading-relaxed mb-2">{section.intro}</p>}
+                      {(section.subsections || []).map((sub, j) => (
+                        <div key={j} className="mt-2">
+                          <div className="text-sm font-bold" style={{ color: accentColor }}>{sub.label}</div>
+                          <ul className="mt-1 space-y-1">
+                            {(sub.bullets || []).map((bullet, k) => (
+                              <li key={k} className="flex items-start gap-2 text-base text-slate-700">
+                                <span style={{ color: accentColor, marginTop: '2px', flexShrink: 0 }}>▸</span>
+                                <span className="leading-relaxed">{typeof bullet === 'string' ? bullet : bullet.text}</span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                      )}
+                      ))}
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {slide.trends_section && (
+              <div>
+                {slide.trends_section.heading && <h3 className="text-lg font-bold text-slate-800 mb-2">{slide.trends_section.heading}</h3>}
+                {(slide.trends_section.subsections || []).map((sub, i) => (
+                  <div key={i} className="mt-3">
+                    <div className="text-sm font-bold" style={{ color: accentColor }}>{sub.label}</div>
+                    <ul className="mt-1 space-y-2">
+                      {(sub.bullets || []).map((bullet, j) => {
+                        const text = typeof bullet === 'string' ? bullet : bullet.text;
+                        const relatedTechs = ((typeof bullet === 'string' ? [] : bullet.related_techs) || []).filter(t => techById?.has(t.id));
+                        return (
+                          <li key={j} className="flex items-start gap-2 text-base text-slate-700">
+                            <span style={{ color: accentColor, marginTop: '2px', flexShrink: 0 }}>▸</span>
+                            <div className="flex-1">
+                              <span className="leading-relaxed">{text}</span>
+                              {relatedTechs.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                  {relatedTechs.map(t => (
+                                    <button
+                                      key={t.id}
+                                      type="button"
+                                      onClick={() => onJumpToTech(t.id)}
+                                      title={uiLang === 'en' ? 'Click to view details' : '點擊查看此技術詳情'}
+                                      className="text-xs px-2 py-0.5 rounded-full font-medium transition-colors hover:brightness-95"
+                                      style={{ background: '#fff', color: accentColor, border: `1px solid ${accentColor}40` }}
+                                    >
+                                      {labels.relatedPrefix}{uiLang === 'en' ? ': ' : '：'}{t.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -1052,23 +1629,23 @@ function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJump
       <div className="w-full mx-auto mt-4" style={{ maxWidth: '700px' }}>
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-bold text-slate-800">
+            <h4 className="text-base font-bold text-slate-800">
               {activeBucket.stage}　{labels.trlListHeading}（共 {activeBucket.count} {labels.countUnit}）
             </h4>
             <button
               type="button"
               onClick={() => { setExpandedTrlBucket(null); setTrendTechId(null); }}
-              className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
+              className="text-sm text-slate-400 hover:text-slate-600 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
             >
               {labels.collapseButton}
             </button>
           </div>
 
           {activeBucketTechs.length === 0 ? (
-            <p className="text-xs text-slate-400 py-2">{labels.trlListEmpty}</p>
+            <p className="text-sm text-slate-400 py-2">{labels.trlListEmpty}</p>
           ) : (
             <>
-              <p className="text-[11px] text-slate-400 mb-2">{labels.trlTechHint}</p>
+              <p className="text-xs text-slate-400 mb-2">{labels.trlTechHint}</p>
               <div className="flex flex-wrap gap-2">
               {activeBucketTechs.map(t => {
                 const isSelected = trendTechId === t.id;
@@ -1077,7 +1654,7 @@ function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJump
                     key={t.id}
                     type="button"
                     onClick={() => setTrendTechId(isSelected ? null : t.id)}
-                    className="text-xs px-3 py-1.5 rounded-full border font-medium transition-colors"
+                    className="text-sm px-3 py-1.5 rounded-full border font-medium transition-colors"
                     style={{
                       background: isSelected ? accentColor : '#fff',
                       color: isSelected ? '#fff' : '#475569',
@@ -1104,6 +1681,55 @@ function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJump
         </div>
       </div>
     )}
+
+    {/* Country drill-down panel — same reasoning as the TRL panel above:
+        outside the fixed-aspect slide card so it can grow freely. Each
+        case jumps straight to its technology (via onJumpToTech) since
+        initiatives don't have a page of their own to link to. */}
+    {activeCountry && (
+      <div className="w-full mx-auto mt-4" style={{ maxWidth: '700px' }}>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-base font-bold text-slate-800">
+              {activeCountry.name}　{labels.countryListHeading}（共 {activeCountry.count} {labels.countUnit}）
+            </h4>
+            <button
+              type="button"
+              onClick={() => setExpandedCountry(null)}
+              className="text-sm text-slate-400 hover:text-slate-600 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
+            >
+              {labels.collapseButton}
+            </button>
+          </div>
+
+          {activeCountryInitiatives.length === 0 ? (
+            <p className="text-sm text-slate-400 py-2">{labels.countryListEmpty}</p>
+          ) : (
+            <>
+              <p className="text-xs text-slate-400 mb-2">{labels.countryCaseHint}</p>
+              <div className="space-y-2">
+                {activeCountryInitiatives.map((init, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => onJumpToTech(init.techId)}
+                    className="w-full text-left border-l-2 pl-4 py-2 rounded-r-lg hover:bg-slate-50 transition-colors"
+                    style={{ borderColor: accentColor }}
+                  >
+                    <div className="flex flex-wrap items-center gap-2 mb-1 text-sm font-medium text-slate-500">
+                      {init.year && <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{init.year}</span>}
+                      {init.type && <span style={{ color: accentColor }}>{init.type}</span>}
+                      <span className="font-semibold underline decoration-dotted underline-offset-2" style={{ color: accentColor }}>{init.techName}</span>
+                    </div>
+                    <p className="text-sm text-slate-700 leading-relaxed">{init.description || (uiLang === 'en' ? 'Unlabeled' : '未標示')}</p>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    )}
     </>
   );
 }
@@ -1124,7 +1750,7 @@ function TrlTrendChart({ tech, displayName, accentColor, chartSuffix, insufficie
   const validCount = points.filter(p => p.val !== null).length;
 
   if (validCount < 2) {
-    return <p className="text-xs text-slate-400 mt-2 py-1">{insufficientDataText || DEFAULT_UI_LABELS.zh.trendInsufficientData}</p>;
+    return <p className="text-sm text-slate-400 mt-2 py-1">{insufficientDataText || DEFAULT_UI_LABELS.zh.trendInsufficientData}</p>;
   }
 
   const w = 320, h = 132, padX = 24, padTop = 26, padBottom = 20;
@@ -1140,7 +1766,7 @@ function TrlTrendChart({ tech, displayName, accentColor, chartSuffix, insufficie
 
   return (
     <div className="mt-2 mb-1 p-3 rounded-lg border" style={{ borderColor: accentColor + '30', background: accentColor + '06' }}>
-      <p className="text-xs font-semibold mb-1" style={{ color: accentColor }}>
+      <p className="text-sm font-semibold mb-1" style={{ color: accentColor }}>
         {label} — {suffix}
       </p>
       <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img">
@@ -1429,41 +2055,32 @@ export default function App() {
   };
 
   // slide1-4 always come from the rule-based baseline (version 0) — AI only
-  // ever owns slide5/slide6, so every AI turn (upgrade or follow-up) merges
+  // ever owns the report, so every AI turn (upgrade or follow-up) merges
   // its partial response back onto that unchanging foundation rather than
   // being trusted to reproduce the stats slides itself.
   const mergeWithBaseSlides = (aiPartial) => {
     const base = versions.list[0]?.geminiData || {};
     return {
       slide1: base.slide1, slide2: base.slide2, slide3: base.slide3, slide4: base.slide4,
-      slide5: aiPartial.slide5, slide6: aiPartial.slide6,
+      report: aiPartial.report,
       ui_labels: base.ui_labels
     };
   };
 
-  // Step two, triggered from inside the modal: adds the AI-only slide5/6
-  // (trends/risks/correlations, then recommendations) alongside the
-  // untouched rule-based slide1-4, in place, without closing or re-opening
-  // anything.
+  // Step two, triggered from inside the modal: adds the AI-only briefing
+  // report (executive summary + themed sections) alongside the untouched
+  // rule-based slide1-4, in place, without closing or re-opening anything.
   const handleUpgradeToAI = async () => {
     if (!apiKey.trim() || analysisTechs.length === 0) return;
 
     setIsUpgrading(true);
 
-    const requiredKeys = [
-      '_id', 'technology_name_zh', 'sector_zh', 'latest_trl',
-      'technology_status_summary_zh', 'market_dynamics_summary_zh', 'linked_records_count'
-    ];
-    let csvStr = requiredKeys.join(",") + "\n";
-    analysisTechs.forEach(tech => {
-      const row = requiredKeys.map(k => {
-        let val = tech[k] !== undefined && tech[k] !== null ? String(tech[k]) : "";
-        return `"${val.replace(/"/g, '""')}"`;
-      });
-      csvStr += row.join(",") + "\n";
-    });
+    // See buildFullDataCsv for exactly which fields this includes and why
+    // — every linked case record (for real project names/figures to cite),
+    // trimmed of the columns the prompt never actually reads.
+    const csvStr = buildFullDataCsv(analysisTechs);
 
-    const promptText = buildTrendsAndRecommendationsPrompt(csvStr, uiLang);
+    const promptText = buildBriefingReportPrompt(csvStr, uiLang);
 
     try {
       const extractedText = await callAI([{ role: 'user', parts: [{ text: promptText }] }]);
@@ -1492,8 +2109,8 @@ export default function App() {
 
   // Follow-up refinement — reuses the running conversation so only the new
   // instruction needs sending; the model already has the original CSV and
-  // its own prior slide5/6 answer in context. Scoped to those two slides
-  // only, same as the initial upgrade.
+  // its own prior report answer in context. Scoped to the report only, same
+  // as the initial upgrade.
   const handleRefineAnalysis = async (instruction) => {
     if (!geminiData || chatHistory.length === 0 || !instruction.trim() || !apiKey.trim()) return;
 
@@ -1503,7 +2120,7 @@ export default function App() {
       : '目前平台介面是繁體中文模式，除非這個指示明確要求換成別的語言，否則請繼續全部用繁體中文輸出。';
     const newTurn = {
       role: 'user',
-      parts: [{ text: `請根據以下指示調整剛才產生的 slide5、slide6 JSON，維持完全相同的結構，只輸出純 JSON，不要 markdown 或說明文字，也不要輸出 slide1~slide4（那些不歸你管）。${currentLanguageNote}：\n${instruction}` }]
+      parts: [{ text: `請根據以下指示調整剛才產生的 report JSON，維持完全相同的結構，只輸出純 JSON，不要 markdown 或說明文字，也不要輸出 slide1~slide4（那些不歸你管）。${currentLanguageNote}：\n${instruction}` }]
     };
 
     try {
@@ -1531,194 +2148,126 @@ export default function App() {
     setVersions(v => ({ ...v, index: Math.max(0, Math.min(v.list.length - 1, idx)) }));
   };
 
-  // ── PPTX Download ─────────────────────────────────────────────────────────
-  const handleDownloadPPTX = async () => {
-    if (!geminiData) return;
+  // ── Report Download (Word) ────────────────────────────────────────────────
+  // Deliberately scoped to ONLY the AI-generated report (executive summary +
+  // overview table + tech deep-dives + trends) — the rule-based slide1-4
+  // stats are for on-screen viewing only, not part of this export. Renders
+  // as a real Word document via the "docx" library rather than a slide
+  // deck, since a multi-section written report reads better as a document.
+  const handleDownloadReportDocx = async () => {
+    const report = geminiData?.report;
+    if (!report) return;
     setIsDownloading(true);
     try {
-      if (!(window).PptxGenJS) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
+      const isEn = uiLang === 'en';
+      const children = [];
+
+      children.push(new Paragraph({
+        text: report.title || (isEn ? 'AI Insight Report' : 'AI 洞察報告'),
+        heading: HeadingLevel.TITLE
+      }));
+
+      if (report.executive_summary) {
+        children.push(new Paragraph({ text: isEn ? 'Executive Summary' : '摘要', heading: HeadingLevel.HEADING_1, spacing: { before: 300 } }));
+        children.push(new Paragraph({ text: report.executive_summary, spacing: { after: 200 } }));
+      }
+
+      const tableRows = report.overview_table?.rows;
+      if (Array.isArray(tableRows) && tableRows.length > 0) {
+        children.push(new Paragraph({ text: isEn ? 'Technology Overview' : '技術現況總覽表', heading: HeadingLevel.HEADING_1, spacing: { before: 300 } }));
+        const headerLabels = isEn
+          ? ['Technology', 'Energy Source', 'TRL', 'Market Dynamics']
+          : ['技術類別', '能源來源', 'TRL', '主要市場動態'];
+        const headerRow = new TableRow({
+          tableHeader: true,
+          children: headerLabels.map(h => new TableCell({
+            width: { size: 25, type: WidthType.PERCENTAGE },
+            shading: { fill: '1F2937' },
+            children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF' })] })]
+          }))
+        });
+        const bodyRows = tableRows.map(row => new TableRow({
+          children: [row.name, row.energy_source, row.trl, row.market_dynamics].map(val => new TableCell({
+            width: { size: 25, type: WidthType.PERCENTAGE },
+            children: [new Paragraph({ text: String(val || '') })]
+          }))
+        }));
+        children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...bodyRows] }));
+        // A blank paragraph after the table — Word renders content
+        // immediately butted against a table's bottom edge otherwise.
+        children.push(new Paragraph({ text: '' }));
+      }
+
+      const techSections = report.tech_sections;
+      if (Array.isArray(techSections) && techSections.length > 0) {
+        children.push(new Paragraph({ text: isEn ? 'In-Depth Technology Analysis' : '核心技術深度分析', heading: HeadingLevel.HEADING_1, spacing: { before: 400 } }));
+        techSections.forEach((section, i) => {
+          children.push(new Paragraph({ text: `${i + 1}. ${section.heading || ''}`, heading: HeadingLevel.HEADING_2, spacing: { before: 300 } }));
+          if (section.intro) {
+            children.push(new Paragraph({ children: [new TextRun({ text: section.intro, italics: true })], spacing: { after: 100 } }));
+          }
+          (section.subsections || []).forEach(sub => {
+            children.push(new Paragraph({ children: [new TextRun({ text: sub.label || '', bold: true })], spacing: { before: 150 } }));
+            (sub.bullets || []).forEach(bullet => {
+              const text = typeof bullet === 'string' ? bullet : bullet.text;
+              children.push(new Paragraph({ text, bullet: { level: 0 } }));
+            });
+          });
         });
       }
 
-      const PptxGenJS = (window).PptxGenJS;
-      const pptx = new PptxGenJS();
-      pptx.defineLayout({ name: 'CUSTOM_WIDE', width: 13.333, height: 7.5 });
-      pptx.layout = 'CUSTOM_WIDE';
-      pptx.title = 'IEA 技術發展策略摘要';
-
-      const C = {
-        white: 'FFFFFF', bg: 'F8FAFC', slate50: 'F8FAFC', slate100: 'F1F5F9',
-        slate700: '374151', slate500: '64748B', slate400: '94A3B8', slate300: 'CBD5E1',
-        accent: [
-          ['2563EB', 'EFF6FF'],
-          ['059669', 'ECFDF5'],
-          ['7C3AED', 'F5F3FF'],
-          ['D97706', 'FFFBEB'],
-          ['0D9488', 'F0FDFA'],
-          ['DC2626', 'FEF2F2'],
-        ]
-      };
-      const FONT = 'Noto Sans';
-
-      // Filtered (not just left sparse) so slides.length reflects what's
-      // actually being exported — slide5/6 only exist once upgraded to AI,
-      // and this same array also drives the "X / Y" page label per slide.
-      const slides = [geminiData.slide1, geminiData.slide2, geminiData.slide3, geminiData.slide4, geminiData.slide5, geminiData.slide6].filter(Boolean);
-      const slideIcons = ['📊', '🔬', '🌍', '🏆', '🔍', '💡'];
-
-      // Shared so slide 5 can spawn continuation slides (same header/style)
-      // when its recommendations don't fit on one page, without duplicating
-      // the header-drawing code for every branch.
-      const addSlideHeader = (idx, title, subtitle, pageLabel) => {
-        const [accent, accentLight] = C.accent[idx % C.accent.length];
-        const slide = pptx.addSlide();
-        slide.background = { color: C.white };
-
-        slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.333, h: 0.08, fill: { color: accent } });
-        slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0.08, w: 13.333, h: 1.6, fill: { color: C.bg }, line: { color: C.slate300, width: 0.5 } });
-        slide.addText(`${slideIcons[idx]} ${title || ''}`, { x: 0.5, y: 0.2, w: 9.4, h: 0.65, fontFace: FONT, fontSize: 26, bold: true, color: C.slate700 });
-        if (subtitle) {
-          slide.addText(subtitle, { x: 0.5, y: 0.9, w: 9.4, h: 0.3, fontFace: FONT, fontSize: 11, color: C.slate500 });
-        }
-        // Footer info now lives up here (small, right-aligned) instead of at
-        // the bottom, where it used to sit on top of long slide content.
-        slide.addText(pageLabel, { x: 10.2, y: 0.35, w: 2.6, h: 0.3, fontFace: FONT, fontSize: 10, color: C.slate400, align: 'right' });
-        slide.addText('IEA ETP Clean Energy Technology Guide · AI Generated', {
-          x: 10.2, y: 0.62, w: 2.6, h: 0.5, fontFace: FONT, fontSize: 7.5, color: C.slate400, align: 'right', wrap: true
-        });
-        slide.addShape(pptx.ShapeType.rect, { x: 0.5, y: 1.55, w: 0.5, h: 0.04, fill: { color: accent } });
-
-        return { slide, accent, accentLight };
-      };
-
-      slides.forEach((slideData, idx) => {
-        if (!slideData) return;
-        const { slide, accent, accentLight } = addSlideHeader(idx, slideData.title, slideData.subtitle, `${idx + 1} / ${slides.length}`);
-
-        // Content
-        const contentY = 1.8;
-
-        if (idx === 0 && slideData.summary) {
-          slide.addText(slideData.summary, { x: 0.5, y: contentY, w: 12.3, h: 0.7, fontFace: FONT, fontSize: 13, color: C.slate700 });
-          if (slideData.kpis) {
-            slideData.kpis.forEach((kpi, i) => {
-              const x = 0.5 + i * 4.2;
-              slide.addShape(pptx.ShapeType.roundRect, { x, y: contentY + 0.9, w: 3.8, h: 1.5, rectRadius: 0.1, fill: { color: accentLight }, line: { color: accent, width: 0.8 } });
-              slide.addText(String(kpi.value), { x, y: contentY + 1.05, w: 3.8, h: 0.65, fontFace: FONT, fontSize: 32, bold: true, color: accent, align: 'center' });
-              slide.addText(String(kpi.label), { x, y: contentY + 1.75, w: 3.8, h: 0.3, fontFace: FONT, fontSize: 11, color: C.slate500, align: 'center' });
-            });
-          }
-        }
-
-        if (idx === 1 && slideData.trl_breakdown) {
-          if (slideData.summary) {
-            slide.addText(slideData.summary, { x: 0.5, y: contentY, w: 12.3, h: 0.5, fontFace: FONT, fontSize: 12, color: C.slate700 });
-          }
-          const total = slideData.total || 1;
-          slideData.trl_breakdown.forEach((item, i) => {
-            const y = contentY + 0.7 + i * 1.1;
-            const barW = Math.max(0.1, (item.count / total) * 9);
-            slide.addText(item.stage, { x: 0.5, y, w: 3, h: 0.35, fontFace: FONT, fontSize: 11, color: C.slate500 });
-            slide.addShape(pptx.ShapeType.rect, { x: 3.7, y: y + 0.05, w: 9, h: 0.35, fill: { color: C.slate100 } });
-            slide.addShape(pptx.ShapeType.rect, { x: 3.7, y: y + 0.05, w: barW, h: 0.35, fill: { color: accent } });
-            slide.addText(String(item.count), { x: 12.8, y, w: 0.5, h: 0.35, fontFace: FONT, fontSize: 11, bold: true, color: C.slate700, align: 'right' });
-          });
-        }
-
-        if (idx === 2) {
-          if (slideData.summary) {
-            slide.addText(slideData.summary, { x: 0.5, y: contentY, w: 12.3, h: 0.6, fontFace: FONT, fontSize: 12, color: C.slate700 });
-          }
-          if (slideData.countries) {
-            slideData.countries.forEach((country, i) => {
-              const col = i % 3, row = Math.floor(i / 3);
-              const x = 0.5 + col * 4.2;
-              const y = contentY + 0.8 + row * 0.8;
-              slide.addShape(pptx.ShapeType.roundRect, { x, y, w: 3.8, h: 0.55, rectRadius: 0.08, fill: { color: accentLight }, line: { color: accent, width: 0.6 } });
-              slide.addText(country, { x, y, w: 3.8, h: 0.55, fontFace: FONT, fontSize: 13, bold: true, color: accent, align: 'center', valign: 'middle' });
-            });
-          }
-        }
-
-        if (idx === 3 && slideData.top_techs) {
-          slideData.top_techs.forEach((tech, i) => {
-            const y = contentY + i * 0.95;
-            slide.addShape(pptx.ShapeType.ellipse, { x: 0.5, y: y + 0.05, w: 0.45, h: 0.45, fill: { color: accent } });
-            slide.addText(String(i + 1), { x: 0.5, y: y + 0.05, w: 0.45, h: 0.45, fontFace: FONT, fontSize: 12, bold: true, color: C.white, align: 'center', valign: 'middle' });
-            slide.addText(tech.name, { x: 1.15, y: y + 0.05, w: 9.5, h: 0.45, fontFace: FONT, fontSize: 13, color: C.slate700, valign: 'middle' });
-            slide.addText(`${tech.count} 筆`, { x: 10.8, y: y + 0.05, w: 2, h: 0.45, fontFace: FONT, fontSize: 11, color: C.slate500, align: 'right', valign: 'middle' });
-          });
-        }
-
-        const boxItems = slideData.points || slideData.recommendations;
-        if ((idx === 4 || idx === 5) && boxItems) {
-          // slide5 (points: trends/risks/correlations) and slide6
-          // (recommendations) share the same {text, related_techs} shape, so
-          // one rendering pass handles both — just fed from whichever field
-          // the slide actually has.
-          //
-          // A fixed box height per item guessed wrong whenever the AI's text
-          // ran longer than expected. Instead, estimate line count from the
-          // actual text length and stack items with a running cursor. If an
-          // item would run past the bottom margin, spill onto a fresh
-          // continuation slide (same header) rather than clipping it.
-          const estimateLines = (str) => Math.max(1, Math.ceil((str || '').length / 46));
-          const contentBottomLimit = 7.15;
-          let activeSlide = slide;
-          let activeAccent = accent;
-          let activeAccentLight = accentLight;
-          let cursorY = contentY;
-          let continuationCount = 0;
-
-          boxItems.forEach((rec) => {
-            const recText = typeof rec === 'string' ? rec : rec.text;
-            const relatedTechs = typeof rec === 'string' ? [] : (rec.related_techs || []);
-            const relatedNames = relatedTechs.filter(t => techById.has(t.id)).map(t => t.name);
-
-            const textH = estimateLines(recText) * 0.26 + 0.15;
-            const relatedH = relatedNames.length > 0 ? 0.32 : 0;
-            const boxH = textH + relatedH + 0.15;
-
-            if (cursorY + boxH > contentBottomLimit) {
-              continuationCount += 1;
-              const created = addSlideHeader(idx, `${slideData.title || ''}（續）`, slideData.subtitle, `${idx + 1} / ${slides.length}・續${continuationCount}`);
-              activeSlide = created.slide;
-              activeAccent = created.accent;
-              activeAccentLight = created.accentLight;
-              cursorY = contentY;
-            }
-
-            const y = cursorY;
-            activeSlide.addShape(pptx.ShapeType.roundRect, { x: 0.5, y, w: 12.3, h: boxH, rectRadius: 0.1, fill: { color: activeAccentLight }, line: { color: activeAccent, width: 0.8 } });
-            activeSlide.addShape(pptx.ShapeType.rect, { x: 0.5, y, w: 0.08, h: boxH, fill: { color: activeAccent } });
-            activeSlide.addText(recText, {
-              x: 0.8, y: y + 0.1, w: 11.8, h: textH,
-              fontFace: FONT, fontSize: 12, color: C.slate700, valign: 'top', wrap: true, autoFit: true
-            });
+      if (report.trends_section) {
+        children.push(new Paragraph({
+          text: report.trends_section.heading || (isEn ? 'Key Trends & Strategic Insights' : '關鍵趨勢與戰略洞察'),
+          heading: HeadingLevel.HEADING_1, spacing: { before: 400 }
+        }));
+        (report.trends_section.subsections || []).forEach(sub => {
+          children.push(new Paragraph({ children: [new TextRun({ text: sub.label || '', bold: true })], spacing: { before: 150 } }));
+          (sub.bullets || []).forEach(bullet => {
+            const text = typeof bullet === 'string' ? bullet : bullet.text;
+            const relatedTechs = (typeof bullet === 'string' ? [] : (bullet.related_techs || [])).filter(t => techById.has(t.id));
+            const relatedNames = relatedTechs.map(t => t.name);
+            const runs = [new TextRun({ text })];
             if (relatedNames.length > 0) {
               const relatedPrefix = geminiData?.ui_labels?.relatedPrefix || DEFAULT_UI_LABELS[uiLang]?.relatedPrefix || DEFAULT_UI_LABELS.zh.relatedPrefix;
-              const separator = uiLang === 'en' ? ': ' : '：';
-              const joiner = uiLang === 'en' ? ', ' : '、';
-              activeSlide.addText(`${relatedPrefix}${separator}${relatedNames.join(joiner)}`, {
-                x: 0.8, y: y + 0.1 + textH, w: 11.8, h: relatedH,
-                fontFace: FONT, fontSize: 9.5, italic: true, color: C.slate500, valign: 'top', autoFit: true
-              });
+              const separator = isEn ? ': ' : '：';
+              const joiner = isEn ? ', ' : '、';
+              runs.push(new TextRun({ text: `  (${relatedPrefix}${separator}${relatedNames.join(joiner)})`, italics: true, color: '64748B' }));
             }
-
-            cursorY += boxH + 0.25;
+            children.push(new Paragraph({ children: runs, bullet: { level: 0 } }));
           });
-        }
-      });
+        });
+      }
 
-      await pptx.writeFile({ fileName: `IEA_AI_策略簡報_${new Date().getTime()}.pptx` });
+      const doc = new Document({ sections: [{ children }] });
+      const safeTitle = String(report.title || (isEn ? 'AI_Insight_Report' : 'AI_洞察報告')).replace(/[\\/:*?"<>|]/g, '').slice(0, 60);
+      await downloadDocxBlob(doc, `${safeTitle}.docx`);
     } catch (error) {
-      alert("下載簡報時發生錯誤: " + error.message);
+      alert("下載報告時發生錯誤: " + error.message);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  // ── Report Download (PDF) ─────────────────────────────────────────────────
+  // Same report-only scope as the Word export above, but rendered by
+  // mounting buildReportHtml off-screen and rasterizing it (html2canvas)
+  // into a jsPDF document via the shared renderHtmlToPdf, instead of
+  // drawing text with jsPDF's native APIs — see buildReportHtml's comment
+  // for why (no practical way to embed a Traditional Chinese font in
+  // jsPDF here).
+  const handleDownloadReportPdf = async () => {
+    const report = geminiData?.report;
+    if (!report) return;
+    setIsDownloading(true);
+    try {
+      const isEn = uiLang === 'en';
+      const relatedPrefix = geminiData?.ui_labels?.relatedPrefix || DEFAULT_UI_LABELS[uiLang]?.relatedPrefix || DEFAULT_UI_LABELS.zh.relatedPrefix;
+      const html = buildReportHtml(report, uiLang, techById, relatedPrefix);
+      const safeTitle = String(report.title || (isEn ? 'AI_Insight_Report' : 'AI_洞察報告')).replace(/[\\/:*?"<>|]/g, '').slice(0, 60);
+      await renderHtmlToPdf(html, `${safeTitle}.pdf`);
+    } catch (error) {
+      alert("下載報告時發生錯誤: " + error.message);
     } finally {
       setIsDownloading(false);
     }
@@ -1763,7 +2312,8 @@ export default function App() {
           hasApiKey={!!apiKey.trim()}
           onUpgrade={handleUpgradeToAI}
           onClose={() => setShowAIModal(false)}
-          onDownload={handleDownloadPPTX}
+          onDownloadWord={handleDownloadReportDocx}
+          onDownloadPdf={handleDownloadReportPdf}
           isDownloading={isDownloading}
           totalMatches={analysisTotal}
           techById={techById}
@@ -1774,6 +2324,7 @@ export default function App() {
           versionIndex={versions.index}
           onGoToVersion={handleGoToVersion}
           uiLang={uiLang}
+          analysisTechs={analysisTechs}
         />
       )}
 
@@ -1782,7 +2333,7 @@ export default function App() {
       {!showAIModal && geminiData && (
         <button
           onClick={() => setShowAIModal(true)}
-          className="fixed bottom-5 right-5 z-40 flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-sm font-medium pl-4 pr-5 py-2.5 rounded-full shadow-lg transition-all"
+          className="fixed bottom-5 right-5 z-40 flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-base font-medium pl-4 pr-5 py-2.5 rounded-full shadow-lg transition-all"
         >
           <Sparkles size={16} />
           {APP_LABELS[uiLang].backToAiSlides}
@@ -1811,7 +2362,9 @@ function Dashboard({
   const [showAllInitiatives, setShowAllInitiatives] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [copiedArticleKey, setCopiedArticleKey] = useState(null);
   const listContainerRef = useRef(null);
+  const copyResetTimerRef = useRef(null);
 
   const techCount = rows.length;
   const initiativeCount = dataset.source_stats?.initiative_rows ??
@@ -1944,38 +2497,59 @@ function Dashboard({
     handleExportTechsCsv([selectedTech], `IEA_${safeName}`);
   };
 
+  // Copy-to-clipboard companion to buildArticleMarkdown — lets the user jump
+  // straight to notebooklm.google.com and paste, since NotebookLM has no
+  // public API for us to push content into a notebook automatically.
+  const handleCopyTechsArticle = async (techs, copyKey) => {
+    if (!techs || techs.length === 0) return;
+    const md = buildArticleMarkdown(techs, uiLang);
+    try {
+      await navigator.clipboard.writeText(md);
+      setCopiedArticleKey(copyKey);
+      window.clearTimeout(copyResetTimerRef.current);
+      copyResetTimerRef.current = window.setTimeout(() => setCopiedArticleKey(null), 2000);
+    } catch (err) {
+      console.error('Clipboard copy failed', err);
+    }
+  };
+
+  const handleCopyListArticle = () => {
+    const exportTechs = (searchData.results || []).map(r => r.tech);
+    handleCopyTechsArticle(exportTechs, 'list');
+  };
+
   return (
     <div className="h-screen bg-slate-50 flex flex-col font-sans overflow-hidden">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row justify-between items-center shadow-sm z-10 flex-shrink-0">
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-slate-800">{L.appTitle}</h1>
-          <div className="text-sm mt-1.5 flex items-center gap-2 flex-wrap">
+          <h1 className="text-2xl font-bold text-slate-800">{L.appTitle}</h1>
+          <div className="text-base mt-1.5 flex items-center gap-2 flex-wrap">
             <span className="text-slate-500 font-medium">{L.datasetVersion(isSampleData ? L.sampleData : datasetVersion)}</span>
-            {appState.status === 'fallback' && <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs border border-amber-200">{L.fallbackBadge}</span>}
-            {appState.status === 'loading' && <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs border border-blue-200 animate-pulse">{L.loadingBadge}</span>}
+            {appState.status === 'fallback' && <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-sm border border-amber-200">{L.fallbackBadge}</span>}
+            {appState.status === 'loading' && <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-sm border border-blue-200 animate-pulse">{L.loadingBadge}</span>}
             {appState.status === 'success' && (
-              <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-xs border border-emerald-200 flex items-center gap-1">
+              <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-sm border border-emerald-200 flex items-center gap-1">
                 <CheckCircle2 size={12} /> {L.successBadge(techCount, initiativeCount)}
               </span>
             )}
             {appState.status === 'success' && appState.isRawFormat && (
-              <span className="bg-sky-100 text-sky-800 px-2 py-0.5 rounded text-xs border border-sky-200">{L.rawFormatDetected}</span>
+              <span className="bg-sky-100 text-sky-800 px-2 py-0.5 rounded text-sm border border-sky-200">{L.rawFormatDetected}</span>
             )}
             {appState.status === 'error' && (
-              <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded text-xs border border-red-200 flex items-center gap-1">
+              <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded text-sm border border-red-200 flex items-center gap-1">
                 <AlertCircle size={12} /> {appState.errorMsg}
               </span>
             )}
           </div>
         </div>
-        <div className="mt-4 md:mt-0 flex flex-wrap items-center gap-4 text-sm">
+        <div className="mt-4 md:mt-0 flex flex-wrap items-center gap-4 text-base">
 
           <button
             type="button"
             onClick={() => setUiLang(l => (l === 'zh' ? 'en' : 'zh'))}
             title="Switch platform language / 切換平台語言"
-            className="text-xs font-medium px-3 py-1.5 rounded-full border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors flex-shrink-0"
+            className="text-sm font-medium px-3 py-1.5 rounded-full border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors flex-shrink-0"
           >
             {uiLang === 'zh' ? 'EN' : '中文'}
           </button>
@@ -1984,7 +2558,7 @@ function Dashboard({
             value={aiProvider}
             onChange={e => onProviderChange(e.target.value)}
             title={L.aiProviderLabel}
-            className="text-xs font-medium px-2 py-1.5 rounded-lg border border-slate-300 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-sm font-medium px-2 py-1.5 rounded-lg border border-slate-300 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {AI_PROVIDER_ORDER.map(p => <option key={p} value={p}>{AI_PROVIDERS[p].label}</option>)}
           </select>
@@ -1995,7 +2569,7 @@ function Dashboard({
               value={openRouterModel}
               onChange={e => onOpenRouterModelChange(e.target.value)}
               placeholder={L.openRouterModelPlaceholder}
-              className="text-xs text-slate-700 placeholder:text-slate-400 border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 w-44"
+              className="text-sm text-slate-700 placeholder:text-slate-400 border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 w-44"
               autoComplete="off"
               spellCheck={false}
             />
@@ -2008,7 +2582,7 @@ function Dashboard({
               value={apiKey}
               onChange={e => onApiKeyChange(e.target.value)}
               placeholder={L.apiKeyPlaceholder(AI_PROVIDERS[aiProvider].label)}
-              className="text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none w-40"
+              className="text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none w-40"
               autoComplete="off"
               spellCheck={false}
             />
@@ -2033,7 +2607,7 @@ function Dashboard({
               type="button"
               onClick={onRestoreDefault}
               title={L.restoreDefaultData}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors"
             >
               <RotateCcw size={14} /> {L.restoreDefaultData}
             </button>
@@ -2045,15 +2619,15 @@ function Dashboard({
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
 
         {/* Left panel */}
-        <section className="w-full md:w-[320px] lg:w-[340px] flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-white flex flex-col h-1/2 md:h-full min-h-0">
+        <section className="w-full md:w-[400px] lg:w-[460px] flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-white flex flex-col h-1/2 md:h-full min-h-0">
           <div className="p-4 border-b border-slate-100 bg-slate-50 flex-shrink-0">
             <div className="flex gap-2 mb-3">
-              <button onClick={() => setSearchMode('subject')} className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-colors border ${searchMode === 'subject' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}>{L.subjectSearch}</button>
-              <button onClick={() => setSearchMode('fulltext')} className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-colors border ${searchMode === 'fulltext' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}>{L.fulltextSearch}</button>
+              <button onClick={() => setSearchMode('subject')} className={`flex-1 text-sm py-1.5 rounded-md font-medium transition-colors border ${searchMode === 'subject' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}>{L.subjectSearch}</button>
+              <button onClick={() => setSearchMode('fulltext')} className={`flex-1 text-sm py-1.5 rounded-md font-medium transition-colors border ${searchMode === 'fulltext' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}>{L.fulltextSearch}</button>
             </div>
 
             <div className="relative mb-3">
-              <select value={selectedSector} onChange={e => setSelectedSector(e.target.value)} className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm appearance-none bg-white font-medium text-slate-700">
+              <select value={selectedSector} onChange={e => setSelectedSector(e.target.value)} className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base appearance-none bg-white font-medium text-slate-700">
                 <option value="">{L.allSectors}</option>
                 {Object.entries(FIXED_SECTORS).map(([sector, subsectors]) => (
                   <optgroup key={sector} label={`${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}>
@@ -2069,16 +2643,18 @@ function Dashboard({
 
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type="text" placeholder={L.searchPlaceholder} className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-shadow" value={query} onChange={e => setQuery(e.target.value)} />
+              <input type="text" placeholder={L.searchPlaceholder} className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base transition-shadow" value={query} onChange={e => setQuery(e.target.value)} />
             </div>
-            <div className="text-[10.5px] text-slate-500 mt-2 leading-relaxed">{L.searchHint}</div>
+            <div className="text-xs text-slate-500 mt-2 leading-relaxed">{L.searchHint}</div>
 
-            <div className="mt-3 flex justify-between items-center">
-              <div className="text-xs text-slate-600 font-medium">{totalMatches > 0 ? L.resultsCount(totalMatches, currentPage, totalPages) : L.noResultsShort}</div>
+            <div className="mt-3 flex flex-col gap-2">
+              <div className="text-sm text-slate-600 font-medium">{totalMatches > 0 ? L.resultsCount(totalMatches, currentPage, totalPages) : L.noResultsShort}</div>
               {selectedTech && (
-                <button onClick={handleExportSelectedTechCsv} className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded transition-colors">
-                  <Download size={12} /> {L.exportSingle}
-                </button>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button onClick={handleExportSelectedTechCsv} className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded transition-colors">
+                    <Download size={12} /> {L.exportSingle}
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -2105,13 +2681,13 @@ function Dashboard({
                     <li key={idx}>
                       <button onClick={() => { setSelectedTech(tech); setRightPanelTab('detail'); }} className={`w-full text-left p-2.5 rounded-lg transition-colors flex flex-col gap-1 ${isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'}`}>
                         <div className="flex justify-between items-start gap-2">
-                          <span className="font-semibold text-slate-800 text-sm line-clamp-1">{primaryName}</span>
-                          <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${item.isDirectHit ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{item.isDirectHit ? L.directHit : L.descHit}</span>
+                          <span className="font-semibold text-slate-800 text-base line-clamp-1">{primaryName}</span>
+                          <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${item.isDirectHit ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{item.isDirectHit ? L.directHit : L.descHit}</span>
                         </div>
-                        <span className="text-xs text-slate-500 line-clamp-1">{secondaryName || L.unlabeled}</span>
+                        <span className="text-sm text-slate-500 line-clamp-1">{secondaryName || L.unlabeled}</span>
                         <div className="flex justify-between items-center mt-0.5">
-                          <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">{tech.sector_zh || L.unlabeled}</span>
-                          <span className="text-[10px] text-blue-600 font-medium">{L.caseCountInline(tech.linked_records_count || 0)}</span>
+                          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">{tech.sector_zh || L.unlabeled}</span>
+                          <span className="text-xs text-blue-600 font-medium">{L.caseCountInline(tech.linked_records_count || 0)}</span>
                         </div>
                       </button>
                     </li>
@@ -2123,8 +2699,8 @@ function Dashboard({
 
           {totalMatches > 0 && (
             <div className="p-3 border-t border-slate-200 bg-white flex justify-between items-center flex-shrink-0">
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="text-xs font-medium px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors flex items-center gap-1"><ChevronLeft size={14} />{L.prevPage}</button>
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="text-xs font-medium px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors flex items-center gap-1">{L.nextPage}<ChevronRight size={14} /></button>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="text-sm font-medium px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors flex items-center gap-1"><ChevronLeft size={14} />{L.prevPage}</button>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="text-sm font-medium px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors flex items-center gap-1">{L.nextPage}<ChevronRight size={14} /></button>
             </div>
           )}
         </section>
@@ -2139,13 +2715,13 @@ function Dashboard({
           <div className="flex border-b border-slate-200 bg-white px-4 md:px-6 flex-shrink-0">
             <button
               onClick={() => setRightPanelTab('detail')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${rightPanelTab === 'detail' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-3 text-base font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${rightPanelTab === 'detail' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
               <FileText size={14} /> {L.detailTab}
             </button>
             <button
               onClick={() => setRightPanelTab('strategy')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${rightPanelTab === 'strategy' ? 'border-purple-600 text-purple-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-3 text-base font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${rightPanelTab === 'strategy' ? 'border-purple-600 text-purple-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
               <Sparkles size={14} /> {L.strategyTab}
             </button>
@@ -2163,9 +2739,9 @@ function Dashboard({
                   <div className="max-w-3xl mx-auto w-full space-y-5 pb-20">
                     {/* Tech header */}
                     <div className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200">
-                      <h2 className="text-xl md:text-2xl font-bold text-slate-900 mb-1">{uiLang === 'en' ? (selectedTech.technology_name || techLabel(selectedTech)) : (selectedTech.technology_name_zh || selectedTech.technology_name || L.unlabeled)}</h2>
-                      <p className="text-xs md:text-sm text-slate-500 font-mono mb-4">{(uiLang === 'en' ? selectedTech.technology_name_zh : selectedTech.technology_name) || L.unlabeled}</p>
-                      <div className="flex flex-wrap gap-2 text-xs font-medium">
+                      <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-1">{uiLang === 'en' ? (selectedTech.technology_name || techLabel(selectedTech)) : (selectedTech.technology_name_zh || selectedTech.technology_name || L.unlabeled)}</h2>
+                      <p className="text-sm md:text-base text-slate-500 font-mono mb-4">{(uiLang === 'en' ? selectedTech.technology_name_zh : selectedTech.technology_name) || L.unlabeled}</p>
+                      <div className="flex flex-wrap gap-2 text-sm font-medium">
                         <span className="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 rounded">{L.fieldSector((uiLang === 'en' ? selectedTech.sector_en : null) || selectedTech.sector_zh || L.unlabeled)}</span>
                         <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2 py-1 rounded">{L.fieldTrl(selectedTech.latest_trl || L.unlabeled)}</span>
                         <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded">{L.fieldCaseCount(selectedTech.linked_records_count || 0)}</span>
@@ -2175,32 +2751,32 @@ function Dashboard({
                     {/* Summary */}
                     <div className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200">
                       <div className="border-b border-slate-200 pb-4 mb-4">
-                        <h3 className="text-lg font-semibold text-slate-800 mb-3">{L.summaryTitle}</h3>
-                        <div className="bg-amber-50 text-amber-700 px-3 py-2 rounded text-xs font-medium border border-amber-200 inline-flex items-start gap-1.5">
+                        <h3 className="text-xl font-semibold text-slate-800 mb-3">{L.summaryTitle}</h3>
+                        <div className="bg-amber-50 text-amber-700 px-3 py-2 rounded text-sm font-medium border border-amber-200 inline-flex items-start gap-1.5">
                           <Info size={14} className="mt-0.5 flex-shrink-0" />
                           <span>{L.aiDisclaimer}</span>
                         </div>
                       </div>
                       <div className="space-y-5">
                         <div className="space-y-1.5">
-                          <h4 className="text-sm font-bold text-slate-600">{L.summaryTitle}</h4>
+                          <h4 className="text-base font-bold text-slate-600">{L.summaryTitle}</h4>
                           {(uiLang === 'en'
                             ? (selectedTech.technology_status_summary_en || selectedTech.description_en || selectedTech.description || selectedTech.technology_status_summary_zh)
                             : (selectedTech.technology_status_summary_zh || selectedTech.description_zh || selectedTech.description))
-                            ? <p className="text-sm text-slate-700 leading-relaxed">{uiLang === 'en'
+                            ? <p className="text-base text-slate-700 leading-relaxed">{uiLang === 'en'
                                 ? (selectedTech.technology_status_summary_en || selectedTech.description_en || selectedTech.description || selectedTech.technology_status_summary_zh)
                                 : (selectedTech.technology_status_summary_zh || selectedTech.description_zh || selectedTech.description)}</p>
-                            : <p className="text-sm text-slate-400 italic">{L.noSummary}</p>}
+                            : <p className="text-base text-slate-400 italic">{L.noSummary}</p>}
                         </div>
                         <div className="space-y-1.5 pt-4 border-t border-slate-100">
-                          <h4 className="text-sm font-bold text-slate-600">{L.marketTitle}</h4>
+                          <h4 className="text-base font-bold text-slate-600">{L.marketTitle}</h4>
                           {(uiLang === 'en'
                             ? (selectedTech.market_dynamics_summary_en || selectedTech.NZErationale_en || selectedTech.NZErationale || selectedTech.market_dynamics_summary_zh)
                             : (selectedTech.market_dynamics_summary_zh || selectedTech.NZErationale_zh || selectedTech.NZErationale))
-                            ? <p className="text-sm text-slate-700 leading-relaxed">{uiLang === 'en'
+                            ? <p className="text-base text-slate-700 leading-relaxed">{uiLang === 'en'
                                 ? (selectedTech.market_dynamics_summary_en || selectedTech.NZErationale_en || selectedTech.NZErationale || selectedTech.market_dynamics_summary_zh)
                                 : (selectedTech.market_dynamics_summary_zh || selectedTech.NZErationale_zh || selectedTech.NZErationale)}</p>
-                            : <p className="text-sm text-slate-400 italic">{L.noMarket}</p>}
+                            : <p className="text-base text-slate-400 italic">{L.noMarket}</p>}
                         </div>
                       </div>
                     </div>
@@ -2208,10 +2784,10 @@ function Dashboard({
                     {/* Initiatives */}
                     <div className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200">
                       <div className="flex flex-wrap justify-between items-center mb-4 gap-3">
-                        <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                        <h3 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
                           <Database size={18} className="text-emerald-500" /> {L.initiativesTitle}
                         </h3>
-                        <span className="text-sm bg-slate-100 text-slate-600 px-2 py-1 rounded-full border border-slate-200">{L.totalCount(sortedInitiatives.length)}</span>
+                        <span className="text-base bg-slate-100 text-slate-600 px-2 py-1 rounded-full border border-slate-200">{L.totalCount(sortedInitiatives.length)}</span>
                       </div>
                       {sortedInitiatives.length === 0 ? (
                         <div className="text-center text-slate-500 py-8 bg-slate-50 rounded-lg border border-slate-100 border-dashed">{L.noInitiatives}</div>
@@ -2219,12 +2795,12 @@ function Dashboard({
                         <div className="space-y-4">
                           {displayedInitiatives.map((init, idx) => (
                             <div key={idx} className="border-l-2 border-emerald-400 pl-4 py-1">
-                              <div className="flex flex-wrap gap-2 mb-1 text-xs font-medium text-slate-500">
+                              <div className="flex flex-wrap gap-2 mb-1 text-sm font-medium text-slate-500">
                                 {init.year && <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{init.year}</span>}
                                 {init.country && <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100">{init.country}</span>}
                                 {init.type && <span className="text-blue-600">{init.type}</span>}
                               </div>
-                              <p className="text-sm text-slate-700 leading-relaxed mt-1">
+                              <p className="text-base text-slate-700 leading-relaxed mt-1">
                                 {init.description || L.unlabeled}
                                 {init.read_more && <a href={init.read_more} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline ml-2">{L.sourceLink}</a>}
                               </p>
@@ -2232,7 +2808,7 @@ function Dashboard({
                           ))}
                           {sortedInitiatives.length > 3 && (
                             <div className="text-center pt-3 border-t border-slate-100">
-                              <button onClick={() => setShowAllInitiatives(!showAllInitiatives)} className="text-xs text-blue-600 hover:text-blue-800 font-medium px-4 py-1.5 bg-blue-50 hover:bg-blue-100 rounded transition-colors">
+                              <button onClick={() => setShowAllInitiatives(!showAllInitiatives)} className="text-sm text-blue-600 hover:text-blue-800 font-medium px-4 py-1.5 bg-blue-50 hover:bg-blue-100 rounded transition-colors">
                                 {showAllInitiatives ? L.collapseCases : L.expandCases(sortedInitiatives.length)}
                               </button>
                             </div>
@@ -2249,8 +2825,8 @@ function Dashboard({
               <div className="flex-1 flex flex-col overflow-y-auto p-4 md:p-8 w-full">
                 <div className="max-w-2xl mx-auto w-full space-y-6">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-800">{L.strategyTitle}</h2>
-                    <p className="text-sm text-slate-500 mt-1">{L.strategySubtitle}</p>
+                    <h2 className="text-xl font-bold text-slate-800">{L.strategyTitle}</h2>
+                    <p className="text-base text-slate-500 mt-1">{L.strategySubtitle}</p>
                   </div>
 
                   {/* Strategy overview card — opens instantly with a rule-based
@@ -2263,8 +2839,8 @@ function Dashboard({
                         <Sparkles size={22} />
                       </div>
                       <div>
-                        <h3 className="text-base font-bold text-slate-800">{L.strategyCardTitle}</h3>
-                        <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+                        <h3 className="text-lg font-bold text-slate-800">{L.strategyCardTitle}</h3>
+                        <p className="text-base text-slate-500 mt-1 leading-relaxed">
                           {L.strategyCardDescPrefix} <span className="font-semibold text-slate-700">{totalMatches}</span> {L.strategyCardDescSuffix}
                         </p>
                       </div>
@@ -2272,7 +2848,7 @@ function Dashboard({
                     <button
                       onClick={() => onOpenStrategyOverview(searchData)}
                       disabled={totalMatches === 0}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-sm font-semibold transition-all"
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-all"
                     >
                       <Sparkles size={18} /> {L.openStrategyBtn}
                     </button>
@@ -2285,19 +2861,40 @@ function Dashboard({
                         <Download size={22} />
                       </div>
                       <div>
-                        <h3 className="text-base font-bold text-slate-800">{L.exportStrategyTitle}</h3>
-                        <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+                        <h3 className="text-lg font-bold text-slate-800">{L.exportStrategyTitle}</h3>
+                        <p className="text-base text-slate-500 mt-1 leading-relaxed">
                           {L.exportStrategyDescPrefix} <span className="font-semibold text-slate-700">{totalMatches}</span> {L.exportStrategyDescSuffix}
                         </p>
                       </div>
                     </div>
-                    <button
-                      onClick={handleExportListCsv}
-                      disabled={totalMatches === 0}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-sm font-semibold transition-colors"
-                    >
-                      <Download size={18} /> {L.exportAll}
-                    </button>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={handleExportListCsv}
+                        disabled={totalMatches === 0}
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
+                      >
+                        <Download size={18} /> {L.exportAll}
+                      </button>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-3 items-center">
+                      <button
+                        onClick={handleCopyListArticle}
+                        disabled={totalMatches === 0}
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:cursor-not-allowed text-slate-700 border border-slate-300 shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
+                      >
+                        <Copy size={18} /> {copiedArticleKey === 'list' ? L.copied : L.copyArticle}
+                      </button>
+                      <a
+                        href="https://notebooklm.google.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
+                      >
+                        <ExternalLink size={18} /> {L.openNotebookLM}
+                      </a>
+                    </div>
+                    <p className="text-sm text-slate-400 mt-3 leading-relaxed">{L.copyArticleReminder}</p>
                   </div>
                 </div>
               </div>
@@ -2306,7 +2903,7 @@ function Dashboard({
         </section>
       </main>
 
-      <footer className="bg-slate-800 text-slate-400 text-xs py-3 px-6 text-center z-30 flex-shrink-0">
+      <footer className="bg-slate-800 text-slate-400 text-sm py-3 px-6 text-center z-30 flex-shrink-0">
         {L.footerDisclaimer}
       </footer>
     </div>
