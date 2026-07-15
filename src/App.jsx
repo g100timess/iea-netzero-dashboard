@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, FileJson, AlertCircle, ChevronLeft, ChevronRight, Database, FileText, Info, CheckCircle2, Download, Sparkles, X, Loader2, KeyRound, Eye, EyeOff, RotateCcw, Copy, ExternalLink, ChevronDown, Globe } from 'lucide-react';
+import { Search, FileJson, AlertCircle, ChevronLeft, ChevronRight, Database, FileText, Info, CheckCircle2, Download, Sparkles, X, Loader2, KeyRound, Eye, EyeOff, RotateCcw, Copy, ExternalLink, ChevronDown, ChevronUp, Globe } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } from 'docx';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
@@ -587,8 +587,14 @@ const APP_LABELS = {
     sectorDistributionHint: '滑鼠移到色塊查看細節',
     strategyCardTitle: '策略總覽與 AI 洞察',
     strategyCardDescPrefix: '立即查看目前符合條件的全部',
+    strategyCardDescCheckedPrefix: '以你勾選的',
     strategyCardDescSuffix: '筆技術的整體分析，之後可選擇升級為 AI 深度洞察。',
     openStrategyBtn: '開啟策略總覽',
+    checkedSubsetBadge: (n) => `已依勾選項目篩選：${n} 項技術`,
+    checkedCountBar: (n) => `已勾選 ${n} 項技術（策略總覽將以勾選項目為準）`,
+    clearChecked: '清除勾選',
+    collapseSearch: '收合搜尋列',
+    expandSearch: '展開搜尋列',
     footerDisclaimer: '免責文字：根據 IEA ETP Clean Energy Technology Guide 快取資料生成，正式引用前請核對原始 IEA 資料。',
     loadingFromGithub: '正在載入資料...',
     githubLoadSuccess: '資料載入成功',
@@ -665,8 +671,14 @@ const APP_LABELS = {
     sectorDistributionHint: 'Hover a segment for details',
     strategyCardTitle: 'Strategy Overview & AI Insight',
     strategyCardDescPrefix: 'Instantly view an overview of all',
+    strategyCardDescCheckedPrefix: 'Run on your',
     strategyCardDescSuffix: 'matching technologies, with the option to upgrade to AI-generated insight afterwards.',
     openStrategyBtn: 'Open Strategy Overview',
+    checkedSubsetBadge: (n) => `Filtered to your checked selection: ${n} technologies`,
+    checkedCountBar: (n) => `${n} technologies checked (the strategy overview will use only these)`,
+    clearChecked: 'Clear selection',
+    collapseSearch: 'Collapse search bar',
+    expandSearch: 'Expand search bar',
     footerDisclaimer: 'Disclaimer: generated from cached IEA ETP Clean Energy Technology Guide data — verify against the original IEA source before formal citation.',
     loadingFromGithub: 'Loading data...',
     githubLoadSuccess: 'Data loaded successfully',
@@ -697,7 +709,24 @@ function countOccurrences(text, q) {
 
 function escapeCsv(val) {
   if (val === null || val === undefined) return '""';
-  return `"${String(val).replace(/"/g, '""')}"`;
+  let str = String(val);
+  // Neutralize spreadsheet formula injection: Excel treats cells starting
+  // with = + - @ (or tab/CR) as formulas even inside a quoted CSV field,
+  // which malicious cell content (e.g. from an untrusted uploaded dataset)
+  // could abuse to execute commands on open. A leading apostrophe forces
+  // Excel to read the cell as plain text.
+  if (/^[=+\-@\t\r]/.test(str)) str = "'" + str;
+  return `"${str.replace(/"/g, '""')}"`;
+}
+
+// Only http/https URLs may be rendered as clickable links — a dataset is
+// user-uploadable JSON, so a malicious file could otherwise smuggle a
+// javascript: URL into a link's href (React only warns on those, it does
+// not block them), which on click would run script in the app's origin
+// and could e.g. read the stored API keys.
+function safeLinkUrl(url) {
+  if (typeof url !== 'string') return null;
+  return /^https?:\/\//i.test(url.trim()) ? url.trim() : null;
 }
 
 // Curated to exactly the fields the briefing report prompt actually reads
@@ -2313,11 +2342,14 @@ export default function App() {
     const model = aiProvider === 'openrouter' ? openRouterModel.trim() : AI_PROVIDERS[aiProvider].defaultModel;
 
     if (aiProvider === 'gemini') {
+      // Key goes in the x-goog-api-key header (officially supported), not a
+      // ?key= query param — URLs get recorded in proxy logs and browser
+      // history, headers don't.
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
           body: JSON.stringify({ contents, generationConfig: { responseMimeType: "application/json" } })
         }
       );
@@ -2873,8 +2905,23 @@ function Dashboard({
   const [showApiKey, setShowApiKey] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedArticleKey, setCopiedArticleKey] = useState(null);
+  // Search header collapse — folds the mode toggle / sector dropdown /
+  // search input away so the technology list below gets the vertical space.
+  const [searchPanelCollapsed, setSearchPanelCollapsed] = useState(false);
+  // Per-technology checkbox selection (by _id). When any matched techs are
+  // checked, the Strategy tab (overview modal, donut, exports) runs on just
+  // the checked subset instead of every matched result.
+  const [checkedTechIds, setCheckedTechIds] = useState(() => new Set());
   const listContainerRef = useRef(null);
   const copyResetTimerRef = useRef(null);
+
+  const toggleTechChecked = (id) => {
+    setCheckedTechIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const techCount = rows.length;
   const initiativeCount = dataset.source_stats?.initiative_rows ??
@@ -2953,12 +3000,29 @@ function Dashboard({
   const totalMatches = searchData.totalMatches;
   const totalPages = Math.max(1, Math.ceil(totalMatches / 20));
 
+  // The subset the Strategy tab actually runs on: the checked technologies
+  // (if any of them are among the current matches), otherwise every match.
+  // Intersecting with current results — rather than trusting the checked
+  // set as-is — means stale checkmarks left over from a previous search
+  // can't silently drag unrelated technologies into the analysis.
+  const strategyResults = useMemo(() => {
+    if (checkedTechIds.size === 0) return searchData.results;
+    const checked = searchData.results.filter(r => checkedTechIds.has(r.tech._id));
+    return checked.length > 0 ? checked : searchData.results;
+  }, [searchData.results, checkedTechIds]);
+  const checkedMatchCount = useMemo(
+    () => (checkedTechIds.size === 0 ? 0 : searchData.results.filter(r => checkedTechIds.has(r.tech._id)).length),
+    [searchData.results, checkedTechIds]
+  );
+  const isCheckedSubsetActive = checkedMatchCount > 0;
+  const strategyCount = strategyResults.length;
+
   // Sector-distribution donut for the Strategy tab landing page — live off
-  // whatever the current search/filter has matched, so it updates the same
-  // way "共 N 筆" already does, no separate selection mechanism needed.
+  // the strategy subset (checked techs when any are ticked, else the whole
+  // match set), so it always previews exactly what the overview would run on.
   const sectorDonutData = useMemo(() => {
     const counts = {};
-    searchData.results.forEach(r => {
+    strategyResults.forEach(r => {
       const s = (uiLang === 'en' ? r.tech.sector_en : r.tech.sector_zh) || (uiLang === 'en' ? 'Unlabeled' : '未標示');
       counts[s] = (counts[s] || 0) + 1;
     });
@@ -2972,7 +3036,7 @@ function Dashboard({
     const restCount = sorted.slice(5).reduce((sum, [, c]) => sum + c, 0);
     if (restCount > 0) top.push({ label: uiLang === 'en' ? 'Other' : '其他', value: restCount, color: '#94A3B8' });
     return top;
-  }, [searchData.results, uiLang]);
+  }, [strategyResults, uiLang]);
 
   // Locked-segment summary sentence — rule-based, not AI-generated. Only
   // the zh definitions in SECTOR_DEFINITIONS were hand-reviewed, so English
@@ -2982,7 +3046,7 @@ function Dashboard({
   const lockedSectorStats = useMemo(() => {
     if (!lockedSector) return null;
     const sectorName = lockedSector.label;
-    const techsInSector = searchData.results
+    const techsInSector = strategyResults
       .map(r => r.tech)
       .filter(t => ((uiLang === 'en' ? t.sector_en : t.sector_zh) || (uiLang === 'en' ? 'Unlabeled' : '未標示')) === sectorName);
     if (techsInSector.length === 0) return null;
@@ -3017,7 +3081,7 @@ function Dashboard({
       topCountry: topCountryEntry ? topCountryEntry[0] : null,
       definition: SECTOR_DEFINITIONS[sectorName] || null
     };
-  }, [lockedSector, searchData.results, uiLang]);
+  }, [lockedSector, strategyResults, uiLang]);
 
   const lockedSectorSummary = useMemo(() => {
     if (!lockedSector || !lockedSectorStats) return null;
@@ -3085,8 +3149,8 @@ function Dashboard({
   };
 
   const handleExportListCsv = () => {
-    const exportTechs = (searchData.results || []).map(r => r.tech);
-    handleExportTechsCsv(exportTechs, `IEA_完整查詢結果_${exportTechs.length}筆`);
+    const exportTechs = strategyResults.map(r => r.tech);
+    handleExportTechsCsv(exportTechs, isCheckedSubsetActive ? `IEA_勾選技術_${exportTechs.length}筆` : `IEA_完整查詢結果_${exportTechs.length}筆`);
   };
 
   const handleExportSelectedTechCsv = () => {
@@ -3113,7 +3177,7 @@ function Dashboard({
   };
 
   const handleCopyListArticle = () => {
-    const exportTechs = (searchData.results || []).map(r => r.tech);
+    const exportTechs = strategyResults.map(r => r.tech);
     handleCopyTechsArticle(exportTechs, 'list');
   };
 
@@ -3126,7 +3190,7 @@ function Dashboard({
           always shows dataset.generated_at (a real, static timestamp from
           the cached JSON), never a live-refresh countdown — this dataset
           doesn't auto-update, so implying it does would be misleading. */}
-      <header className="relative overflow-hidden bg-gradient-to-br from-cyan-500 via-blue-600 to-blue-800 px-6 py-5 shadow-lg z-10 flex-shrink-0">
+      <header className="relative overflow-hidden bg-gradient-to-br from-cyan-500 via-blue-600 to-blue-800 px-6 py-3 2xl:py-5 shadow-lg z-10 flex-shrink-0">
         {/* Decorative background — pointer-events-none, low opacity, sits
             behind the real content (z-0) so it never interferes with
             reading or clicking anything above it (z-10). */}
@@ -3200,7 +3264,7 @@ function Dashboard({
         </div>
 
         {/* Secondary row: platform controls (language, AI provider, API key, upload) */}
-        <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center gap-3 text-base">
+        <div className="mt-3 pt-3 2xl:mt-4 2xl:pt-4 border-t border-white/10 flex flex-wrap items-center gap-3 text-base">
 
           <button
             type="button"
@@ -3267,35 +3331,60 @@ function Dashboard({
 
         {/* Left panel */}
         <section className="w-full md:w-[400px] lg:w-[460px] flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-white flex flex-col h-1/2 md:h-full min-h-0">
-          <div className="p-4 border-b border-slate-100 bg-slate-50 flex-shrink-0">
-            <div className="flex gap-2 mb-3">
-              <button onClick={() => setSearchMode('subject')} className={`flex-1 text-sm py-1.5 rounded-md font-medium transition-colors border ${searchMode === 'subject' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}>{L.subjectSearch}</button>
-              <button onClick={() => setSearchMode('fulltext')} className={`flex-1 text-sm py-1.5 rounded-md font-medium transition-colors border ${searchMode === 'fulltext' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}>{L.fulltextSearch}</button>
-            </div>
+          <div className="p-3 2xl:p-4 border-b border-slate-100 bg-slate-50 flex-shrink-0">
+            {/* Collapsible search controls — folding these away hands their
+                vertical space to the technology list below, which is where
+                the checkbox-selection work actually happens. */}
+            {!searchPanelCollapsed && (
+              <>
+                <div className="flex gap-2 mb-2 2xl:mb-3">
+                  <button onClick={() => setSearchMode('subject')} className={`flex-1 text-sm py-1.5 rounded-md font-medium transition-colors border ${searchMode === 'subject' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}>{L.subjectSearch}</button>
+                  <button onClick={() => setSearchMode('fulltext')} className={`flex-1 text-sm py-1.5 rounded-md font-medium transition-colors border ${searchMode === 'fulltext' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}>{L.fulltextSearch}</button>
+                </div>
 
-            <div className="relative mb-3">
-              <select value={selectedSector} onChange={e => setSelectedSector(e.target.value)} className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base appearance-none bg-white font-medium text-slate-700">
-                <option value="">{L.allSectors}</option>
-                {Object.entries(FIXED_SECTORS).map(([sector, subsectors]) => (
-                  <optgroup key={sector} label={`${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}>
-                    <option value={sector}>{uiLang === 'en' ? sector : `全部 ${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}</option>
-                    {subsectors.map(sub => <option key={sub} value={sub}>↳ {uiLang === 'en' ? sub : `${sub} (${SECTOR_TRANSLATIONS[sub] || ''})`}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                <svg className="fill-current h-4 w-4" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                <div className="relative mb-2 2xl:mb-3">
+                  <select value={selectedSector} onChange={e => setSelectedSector(e.target.value)} className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base appearance-none bg-white font-medium text-slate-700">
+                    <option value="">{L.allSectors}</option>
+                    {Object.entries(FIXED_SECTORS).map(([sector, subsectors]) => (
+                      <optgroup key={sector} label={`${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}>
+                        <option value={sector}>{uiLang === 'en' ? sector : `全部 ${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}</option>
+                        {subsectors.map(sub => <option key={sub} value={sub}>↳ {uiLang === 'en' ? sub : `${sub} (${SECTOR_TRANSLATIONS[sub] || ''})`}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                    <svg className="fill-current h-4 w-4" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input type="text" placeholder={L.searchPlaceholder} className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base transition-shadow" value={query} onChange={e => setQuery(e.target.value)} />
+                </div>
+                <div className="text-xs text-slate-500 mt-2 leading-relaxed">{L.searchHint}</div>
+              </>
+            )}
+
+            <div className={`${searchPanelCollapsed ? '' : 'mt-2 2xl:mt-3'} flex flex-col gap-2`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm text-slate-600 font-medium">{totalMatches > 0 ? L.resultsCount(totalMatches, currentPage, totalPages) : L.noResultsShort}</div>
+                <button
+                  onClick={() => setSearchPanelCollapsed(v => !v)}
+                  title={searchPanelCollapsed ? L.expandSearch : L.collapseSearch}
+                  className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 px-2 py-1 rounded transition-colors flex-shrink-0"
+                >
+                  {searchPanelCollapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                  {searchPanelCollapsed ? L.expandSearch : L.collapseSearch}
+                </button>
               </div>
-            </div>
-
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type="text" placeholder={L.searchPlaceholder} className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base transition-shadow" value={query} onChange={e => setQuery(e.target.value)} />
-            </div>
-            <div className="text-xs text-slate-500 mt-2 leading-relaxed">{L.searchHint}</div>
-
-            <div className="mt-3 flex flex-col gap-2">
-              <div className="text-sm text-slate-600 font-medium">{totalMatches > 0 ? L.resultsCount(totalMatches, currentPage, totalPages) : L.noResultsShort}</div>
+              {checkedMatchCount > 0 && (
+                <div className="flex items-center justify-between gap-2 bg-purple-50 border border-purple-100 rounded px-2 py-1.5">
+                  <span className="text-xs text-purple-700 font-medium">{L.checkedCountBar(checkedMatchCount)}</span>
+                  <button onClick={() => setCheckedTechIds(new Set())} className="text-xs font-medium text-purple-600 hover:text-purple-800 underline flex-shrink-0">
+                    {L.clearChecked}
+                  </button>
+                </div>
+              )}
               {selectedTech && (
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button onClick={handleExportSelectedTechCsv} className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded transition-colors">
@@ -3326,17 +3415,28 @@ function Dashboard({
                   const secondaryName = uiLang === 'en' ? tech.technology_name_zh : tech.technology_name;
                   return (
                     <li key={idx}>
-                      <button onClick={() => { setSelectedTech(tech); setRightPanelTab('detail'); }} className={`w-full text-left p-2.5 rounded-lg transition-colors flex flex-col gap-1 ${isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'}`}>
-                        <div className="flex justify-between items-start gap-2">
-                          <span className="font-semibold text-slate-800 text-base line-clamp-1">{primaryName}</span>
-                          <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${item.isDirectHit ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{item.isDirectHit ? L.directHit : L.descHit}</span>
-                        </div>
-                        <span className="text-sm text-slate-500 line-clamp-1">{secondaryName || L.unlabeled}</span>
-                        <div className="flex justify-between items-center mt-0.5">
-                          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">{tech.sector_zh || L.unlabeled}</span>
-                          <span className="text-xs text-blue-600 font-medium">{L.caseCountInline(tech.linked_records_count || 0)}</span>
-                        </div>
-                      </button>
+                      {/* Checkbox sits beside (not inside) the row button —
+                          an input nested in a button is invalid HTML and
+                          the two click targets would fight each other. */}
+                      <div className={`w-full flex items-start gap-2 p-2.5 rounded-lg transition-colors ${isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'}`}>
+                        <input
+                          type="checkbox"
+                          checked={checkedTechIds.has(tech._id)}
+                          onChange={() => toggleTechChecked(tech._id)}
+                          className="mt-1 w-4 h-4 accent-purple-600 flex-shrink-0 cursor-pointer"
+                        />
+                        <button onClick={() => { setSelectedTech(tech); setRightPanelTab('detail'); }} className="flex-1 min-w-0 text-left flex flex-col gap-1">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="font-semibold text-slate-800 text-base line-clamp-1">{primaryName}</span>
+                            <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${item.isDirectHit ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{item.isDirectHit ? L.directHit : L.descHit}</span>
+                          </div>
+                          <span className="text-sm text-slate-500 line-clamp-1">{secondaryName || L.unlabeled}</span>
+                          <div className="flex justify-between items-center mt-0.5">
+                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">{tech.sector_zh || L.unlabeled}</span>
+                            <span className="text-xs text-blue-600 font-medium">{L.caseCountInline(tech.linked_records_count || 0)}</span>
+                          </div>
+                        </button>
+                      </div>
                     </li>
                   );
                 })}
@@ -3449,7 +3549,7 @@ function Dashboard({
                               </div>
                               <p className="text-base text-slate-700 leading-relaxed mt-1">
                                 {init.description || L.unlabeled}
-                                {init.read_more && <a href={init.read_more} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline ml-2">{L.sourceLink}</a>}
+                                {safeLinkUrl(init.read_more) && <a href={safeLinkUrl(init.read_more)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline ml-2">{L.sourceLink}</a>}
                               </p>
                             </div>
                           ))}
@@ -3463,6 +3563,10 @@ function Dashboard({
                         </div>
                       )}
                     </div>
+
+                    {/* Disclaimer — moved here from a dark footer bar so it
+                        blends into the page bottom as muted gray text. */}
+                    <p className="text-xs text-slate-400 text-center leading-relaxed pt-2">{L.footerDisclaimer}</p>
                   </div>
                 )}
               </div>
@@ -3488,7 +3592,10 @@ function Dashboard({
                       <div className="lg:w-[340px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-blue-500 p-6 md:p-8 flex flex-col items-center">
                         <h3 className="text-lg font-bold text-slate-800 mb-1 self-start">{L.sectorDistributionTitle}</h3>
                         <p className="text-xs text-slate-400 mb-5 self-start">{L.sectorDistributionHint}</p>
-                        <DonutChart segments={sectorDonutData} centerValue={totalMatches} centerLabel={L.sectorDistributionCenterLabel} size={208} strokeWidth={22} onLockChange={setLockedSector} />
+                        {isCheckedSubsetActive && (
+                          <p className="text-sm text-purple-600 bg-purple-50 border border-purple-100 rounded px-2 py-1 mb-4 self-start">{L.checkedSubsetBadge(strategyCount)}</p>
+                        )}
+                        <DonutChart segments={sectorDonutData} centerValue={strategyCount} centerLabel={L.sectorDistributionCenterLabel} size={208} strokeWidth={22} onLockChange={setLockedSector} />
                         {lockedSectorSummary && (
                           <p className="text-base text-slate-600 leading-relaxed mt-5 pt-4 border-t border-slate-100 self-stretch">
                             {lockedSectorSummary}
@@ -3510,13 +3617,13 @@ function Dashboard({
                           <div>
                             <h3 className="text-lg font-bold text-slate-800">{L.strategyCardTitle}</h3>
                             <p className="text-base text-slate-500 mt-1 leading-relaxed">
-                              {L.strategyCardDescPrefix} <span className="font-semibold text-slate-700">{totalMatches}</span> {L.strategyCardDescSuffix}
+                              {isCheckedSubsetActive ? L.strategyCardDescCheckedPrefix : L.strategyCardDescPrefix} <span className="font-semibold text-slate-700">{strategyCount}</span> {L.strategyCardDescSuffix}
                             </p>
                           </div>
                         </div>
                         <button
-                          onClick={() => onOpenStrategyOverview(searchData)}
-                          disabled={totalMatches === 0}
+                          onClick={() => onOpenStrategyOverview({ results: strategyResults, totalMatches: strategyCount })}
+                          disabled={strategyCount === 0}
                           className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-all"
                         >
                           <Sparkles size={18} /> {L.openStrategyBtn}
@@ -3532,14 +3639,14 @@ function Dashboard({
                           <div>
                             <h3 className="text-lg font-bold text-slate-800">{L.exportStrategyTitle}</h3>
                             <p className="text-base text-slate-500 mt-1 leading-relaxed">
-                              {L.exportStrategyDescPrefix} <span className="font-semibold text-slate-700">{totalMatches}</span> {L.exportStrategyDescSuffix}
+                              {isCheckedSubsetActive ? L.strategyCardDescCheckedPrefix : L.exportStrategyDescPrefix} <span className="font-semibold text-slate-700">{strategyCount}</span> {L.exportStrategyDescSuffix}
                             </p>
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-3">
                           <button
                             onClick={handleExportListCsv}
-                            disabled={totalMatches === 0}
+                            disabled={strategyCount === 0}
                             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
                           >
                             <Download size={18} /> {L.exportAll}
@@ -3549,7 +3656,7 @@ function Dashboard({
                         <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-3 items-center">
                           <button
                             onClick={handleCopyListArticle}
-                            disabled={totalMatches === 0}
+                            disabled={strategyCount === 0}
                             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:cursor-not-allowed text-slate-700 border border-slate-300 shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
                           >
                             <Copy size={18} /> {copiedArticleKey === 'list' ? L.copied : L.copyArticle}
@@ -3567,6 +3674,10 @@ function Dashboard({
                       </div>
                     </div>
                   </div>
+
+                  {/* Disclaimer — moved here from a dark footer bar so it
+                      blends into the page bottom as muted gray text. */}
+                  <p className="text-xs text-slate-400 text-center leading-relaxed mt-8">{L.footerDisclaimer}</p>
                 </div>
               </div>
             )}
@@ -3574,10 +3685,6 @@ function Dashboard({
         </section>
       </main>
       )}
-
-      <footer className="bg-slate-800 text-slate-400 text-sm py-3 px-6 text-center z-30 flex-shrink-0">
-        {L.footerDisclaimer}
-      </footer>
     </div>
   );
 }
