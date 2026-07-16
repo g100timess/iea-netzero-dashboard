@@ -1070,6 +1070,7 @@ const APP_LABELS = {
     appSubtitle: '技術資料庫查詢 & AI 洞察分析',
     datasetVersion: (v) => `資料版本: ${v}`,
     datasetTimeLabel: '資料版本時間',
+    nextUpdateHint: (d) => `下次資料更新：${d}`,
     sampleData: '測試資料',
     fallbackBadge: '目前使用測試資料',
     loadingBadge: '正在讀取 JSON 資料...',
@@ -1163,6 +1164,7 @@ const APP_LABELS = {
     appSubtitle: 'Technology Database Search & AI Insight Analysis',
     datasetVersion: (v) => `Dataset version: ${v}`,
     datasetTimeLabel: 'Dataset Generated',
+    nextUpdateHint: (d) => `Next data refresh: ${d}`,
     sampleData: 'Sample data',
     fallbackBadge: 'Currently showing sample data',
     loadingBadge: 'Loading JSON data...',
@@ -3691,6 +3693,22 @@ function Dashboard({
     return d.toLocaleString(uiLang === 'en' ? 'en-US' : 'zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   })();
 
+  // Small reminder of the next scheduled case-data refresh (every Monday
+  // ~08:30 local time via scripts/update_case_data.py, see its
+  // 說明.md) — computed from the viewer's current date so it never needs
+  // manual updating. Once today passes the ~13:00 auto-commit cutoff for
+  // that job, treat this week's run as already handled and point at next
+  // week's Monday instead.
+  const nextUpdateLabel = (() => {
+    if (isSampleData) return null;
+    const now = new Date();
+    let daysUntilMonday = (8 - now.getDay()) % 7;
+    if (daysUntilMonday === 0 && now.getHours() >= 13) daysUntilMonday = 7;
+    const next = new Date(now);
+    next.setDate(now.getDate() + daysUntilMonday);
+    return next.toLocaleDateString(uiLang === 'en' ? 'en-US' : 'zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  })();
+
   const searchData = useMemo(() => {
     if (!query.trim() && !selectedSector && !pathFilter) return { results: [], totalMatches: 0 };
     const lowerQuery = query.trim().toLowerCase();
@@ -4051,6 +4069,9 @@ function Dashboard({
             <div className="bg-white/15 border border-white/20 rounded-xl px-4 py-2 text-right">
               <div className="text-[11px] uppercase tracking-wider text-blue-100 font-semibold">{L.datasetTimeLabel}</div>
               <div className="text-sm font-bold text-white mt-0.5 whitespace-nowrap">{generatedAtLabel}</div>
+              {nextUpdateLabel && (
+                <div className="text-[10px] text-blue-100/80 mt-0.5 whitespace-nowrap">{L.nextUpdateHint(nextUpdateLabel)}</div>
+              )}
             </div>
             {isCustomUpload && (
               <button
