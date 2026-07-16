@@ -3694,14 +3694,24 @@ function Dashboard({
   const searchData = useMemo(() => {
     if (!query.trim() && !selectedSector && !pathFilter) return { results: [], totalMatches: 0 };
     const lowerQuery = query.trim().toLowerCase();
-    const lowerSector = selectedSector.trim().toLowerCase();
+    // selectedSector is either a bare top-level category ("Hydrogen") or a
+    // "TopCategory|SubCategory" pair encoded by the dropdown (see the
+    // <option> below) — split back into ordered path segments so membership
+    // can be checked positionally against tech.sector, the same exact-match
+    // approach pathFilter uses, instead of a substring search that used to
+    // match "Production" against any unrelated category whose name merely
+    // contained that word (e.g. "Other production techniques" under a
+    // completely different top-level sector).
+    const sectorParts = selectedSector ? selectedSector.split('|') : [];
+    const lowerSector = sectorParts.length ? sectorParts[sectorParts.length - 1].trim().toLowerCase() : '';
 
     const expandedQueries = lowerQuery ? (SEARCH_ALIASES[lowerQuery] || [lowerQuery]) : [];
 
     let results = rows.map(tech => {
       let score = 0, isDirectHit = false, isDescHit = false;
-      const sectorTexts = [tech.sector_en, tech.sector_en_path, tech.sector_zh, tech.sector_zh_path, tech.breadcrumb, ...(Array.isArray(tech.sector) ? tech.sector : [])].filter(Boolean).map(s => String(s).toLowerCase());
-      const isSectorMatch = selectedSector ? sectorTexts.some(t => t.includes(lowerSector)) : true;
+      const isSectorMatch = selectedSector
+        ? Array.isArray(tech.sector) && tech.sector[1] === sectorParts[0] && (sectorParts.length < 2 || tech.sector[2] === sectorParts[1])
+        : true;
       const subjectTexts = [tech.technology_name, tech.technology_name_zh].filter(Boolean).map(s => String(s).toLowerCase());
       const descTexts = [tech.description, tech.description_en, tech.description_zh, tech.technology_status_summary_zh, tech.market_dynamics_summary_zh, tech.NZErationale, tech.NZErationale_zh, tech.nze_rationale, tech.supplyChain, tech.supply_chain, tech.theme].filter(Boolean).map(s => String(s).toLowerCase());
 
@@ -4134,20 +4144,26 @@ function Dashboard({
                   <button onClick={() => setSearchMode('fulltext')} className={`flex-1 text-sm py-1.5 rounded-md font-medium transition-colors border ${searchMode === 'fulltext' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}>{L.fulltextSearch}</button>
                 </div>
 
-                <div className="relative mb-2 2xl:mb-3">
-                  <select value={selectedSector} onChange={e => { setSelectedSector(e.target.value); setPathFilter(null); }} className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base appearance-none bg-white font-medium text-slate-700">
-                    <option value="">{L.allSectors}</option>
-                    {Object.entries(FIXED_SECTORS).map(([sector, subsectors]) => (
-                      <optgroup key={sector} label={`${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}>
-                        <option value={sector}>{uiLang === 'en' ? sector : `全部 ${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}</option>
-                        {subsectors.map(sub => <option key={sub} value={sub}>↳ {uiLang === 'en' ? sub : `${sub} (${SECTOR_TRANSLATIONS[sub] || ''})`}</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                    <svg className="fill-current h-4 w-4" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                {/* Hidden while a path filter is active — picking anything
+                    here would silently discard the path filter and switch
+                    to this dropdown's own (looser) matching instead, so the
+                    two controls are never useful to show at the same time. */}
+                {!pathFilter && (
+                  <div className="relative mb-2 2xl:mb-3">
+                    <select value={selectedSector} onChange={e => { setSelectedSector(e.target.value); setPathFilter(null); }} className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base appearance-none bg-white font-medium text-slate-700">
+                      <option value="">{L.allSectors}</option>
+                      {Object.entries(FIXED_SECTORS).map(([sector, subsectors]) => (
+                        <optgroup key={sector} label={`${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}>
+                          <option value={sector}>{uiLang === 'en' ? sector : `全部 ${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}</option>
+                          {subsectors.map(sub => <option key={sub} value={`${sector}|${sub}`}>↳ {uiLang === 'en' ? sub : `${sub} (${SECTOR_TRANSLATIONS[sub] || ''})`}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                      <svg className="fill-current h-4 w-4" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -4159,8 +4175,8 @@ function Dashboard({
                     <span className="text-xs text-blue-700 font-medium truncate">
                       {L.pathFilterActive}: {pathFilter.map(seg => uiLang === 'en' ? seg : pathSegmentZh(seg)).join(' > ')}
                     </span>
-                    <button onClick={() => setPathFilter(null)} className="text-xs font-medium text-blue-600 hover:text-blue-800 underline flex-shrink-0">
-                      {L.clearPathFilter}
+                    <button onClick={() => setPathFilter(null)} className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 bg-white hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded transition-colors flex-shrink-0">
+                      <X size={12} /> {L.clearPathFilter}
                     </button>
                   </div>
                 )}
