@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, FileJson, AlertCircle, ChevronLeft, ChevronRight, Database, FileText, Info, CheckCircle2, Download, Sparkles, X, Loader2, KeyRound, Eye, EyeOff, RotateCcw, Copy, ExternalLink, ChevronDown, ChevronUp, Globe } from 'lucide-react';
+import { Search, FileJson, AlertCircle, ChevronLeft, ChevronRight, Database, FileText, Info, CheckCircle2, Download, Sparkles, X, Loader2, KeyRound, Eye, EyeOff, RotateCcw, Copy, ExternalLink, ChevronDown, ChevronUp, Globe, HelpCircle, Presentation } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } from 'docx';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
@@ -65,7 +65,7 @@ const FIXED_SECTORS = {
   "Industry": ["Aluminium", "Metallic products", "Cement and concrete", "Chemicals and plastics", "Industrial heating", "Iron and steel", "Pulp and paper"],
   "Buildings": ["Cooking technologies", "Operations and equipment", "Design and envelope"],
   "Transport": ["Rail", "Aviation", "Road transport", "Shipping"],
-  "Fossil fuels": ["Coal", "Oil and gas"],
+  "Fossil fuels": ["Coal", "Oil and Gas"],
   "Renewables": ["Hydropower", "Ocean", "Wind", "Bioenergy", "Geothermal", "Solar"],
   "Nuclear": ["Fission", "Fusion"],
   "Hydrogen": ["Sythetic fuels production", "H2 infrastructure", "Power generation", "Production"],
@@ -81,18 +81,38 @@ const SECTOR_TRANSLATIONS = {
   "Buildings": "建築", "Cooking technologies": "烹飪技術", "Operations and equipment": "營運與設備",
   "Design and envelope": "設計與外殼", "Transport": "運輸", "Rail": "鐵路", "Aviation": "航空",
   "Road transport": "公路運輸", "Shipping": "航運", "Fossil fuels": "化石燃料", "Coal": "煤炭",
-  "Oil and gas": "石油與天然氣", "Renewables": "再生能源", "Hydropower": "水力發電",
+  "Renewables": "再生能源", "Hydropower": "水力發電",
   "Ocean": "海洋能", "Wind": "風力", "Bioenergy": "生質能", "Geothermal": "地熱",
   "Solar": "太陽能", "Nuclear": "核能", "Fission": "核分裂", "Fusion": "核融合",
   "Hydrogen": "氫能", "Sythetic fuels production": "合成燃料生產", "H2 infrastructure": "氫能基礎設施",
   "Power generation": "發電", "Production": "生產", "Energy networks and storage": "能源網路與儲能",
-  "Thermal storage for buildings and district heating": "建築與區域供熱儲能",
+  "Thermal storage for buildings and district heating": "建築與區域供熱熱能儲存",
   "Mechanical storage": "機械儲能", "Electrochemical storage": "電化學儲能",
-  "Thermal storage": "熱儲存", "Physical grids": "實體電網", "Smart grids": "智慧電網",
+  "Thermal storage": "熱能儲存", "Physical grids": "實體電網", "Smart grids": "智慧電網",
   "Carbon Capture and Storage": "碳捕捉與封存", "CO2 capture": "二氧化碳捕捉",
   "CO2 storage": "二氧化碳封存", "CO2 transport": "二氧化碳運輸",
   "Critical minerals": "關鍵礦物", "Mineral processing and refining": "礦物加工與精煉",
-  "Mining and extraction": "採礦與開採", "E-waste recycling": "電子廢棄物回收"
+  "Mining and extraction": "採礦與開採", "E-waste recycling": "電子廢棄物回收",
+  "Combustion and conversion": "燃燒與轉化", "Components": "航空器零組件",
+  "Other components": "其他零組件", "Thermal processes": "熱製程",
+  "Nuclear fuel cycles": "核燃料循環", "EV charging equipment": "電動車充電設備",
+  "Building-level thermal storage": "建築端熱能儲存",
+  "Ammonia": "氨", "Battery recycling": "電池回收",
+  "Biogases and biomethane production": "沼氣與生質甲烷生產",
+  "Building envelope materials": "建築外殼材料", "Building envelope technologies": "建築外殼技術",
+  "Cross-cutting recycling": "跨領域回收技術",
+  "Electric vehicle battery (electrical storage)": "電動車電池（電能儲存）",
+  "Electrolysis": "電解", "H2 storage": "氫氣儲存",
+  "Heating, cooling and ventilation technologies": "供暖、冷房與通風技術",
+  "High temperature": "高溫",
+  "Hydrogen use in road transport": "氫能於公路運輸之應用",
+  "Liquid biofuels production": "液態生質燃料生產",
+  "Low to medium temperature": "中低溫",
+  "Oil and Gas": "石油與天然氣", "Power generation from biomass": "生質能發電",
+  "Propulsion": "推進系統",
+  "Subsurface operations for geothermal energy": "地熱能地下作業",
+  "digital and tools": "數位技術與工具", "large-scale or industrial": "大型或工業規模技術",
+  "mass-manufactured": "量產型技術"
 };
 
 const SEARCH_ALIASES = {
@@ -103,6 +123,20 @@ const SEARCH_ALIASES = {
   '地熱': ['地熱', 'geothermal'], 'geothermal': ['地熱', 'geothermal'],
   '碳捕捉': ['碳捕捉', 'ccs', 'ccus'], 'ccs': ['碳捕捉', 'ccs', 'ccus'], 'ccus': ['碳捕捉', 'ccs', 'ccus'],
 };
+
+// Chinese label for one segment of a technology's sector[] breadcrumb path.
+// The leaf (last) segment is tech-specific — tech.sector_zh is authoritative
+// there, not a shared lookup table, since sector_en/sector_zh are computed
+// per-technology. Every other position (the manufacturing-scale tag at index
+// 0, and all intermediate category segments) comes from SECTOR_TRANSLATIONS,
+// which the id/id_zh audit confirmed has zero gaps against the real dataset.
+function sectorSegmentLabel(tech, index) {
+  const segments = Array.isArray(tech.sector) ? tech.sector : [];
+  const seg = segments[index];
+  if (seg === undefined) return '';
+  if (index === segments.length - 1) return tech.sector_zh || seg;
+  return SECTOR_TRANSLATIONS[seg] || seg;
+}
 
 const TRL_STAGE_LABELS = ['原型研發 TRL 1-3', '技術示範 TRL 4-6', '商業初期 TRL 7-8', '成熟推廣 TRL 9+'];
 const TRL_STAGE_LABELS_EN = ['Prototype TRL 1-3', 'Demonstration TRL 4-6', 'Early Commercial TRL 7-8', 'Mature/Deployed TRL 9+'];
@@ -122,6 +156,23 @@ function trlStageLabel(stage, uiLang) {
 // TRL_STAGE_LABELS above, just terser wording for an inline sentence.
 const TRL_COMPACT_LABELS_ZH = ['TRL 1-3', 'TRL 4-6', 'TRL 7-8', 'TRL 9+'];
 
+// adoption_stage is a market/commercial-diffusion axis, distinct from TRL
+// (technical maturity) — restored from the original raw IEA source (it had
+// been dropped from this dataset's rebuild). Only 3 raw English values ever
+// appear across all 639 technologies; empty string means IEA didn't rate
+// that technology's adoption stage, not a data error, so the UI hides the
+// badge entirely rather than showing an "unrated" placeholder.
+const ADOPTION_STAGE_LABELS_ZH = {
+  'Awaiting adoption': '尚待導入',
+  'Building momentum': '應用擴大中',
+  'Commercial in many markets': '廣泛商業化',
+};
+function adoptionStageLabel(stage, uiLang) {
+  if (!stage) return '';
+  if (uiLang === 'en') return stage;
+  return ADOPTION_STAGE_LABELS_ZH[stage] || stage;
+}
+
 // One-line, hand-written definitions for every sector_zh value in the
 // cached dataset (132 total) — keyed by the exact sector_zh string. Used
 // only to add a short "what is this" clause to the sector summary sentence
@@ -130,138 +181,432 @@ const TRL_COMPACT_LABELS_ZH = ['TRL 1-3', 'TRL 4-6', 'TRL 7-8', 'TRL 9+'];
 // intentionally has no equivalent map yet (skips the clause rather than
 // guessing a translation) — the definitions were reviewed in Chinese only.
 const SECTOR_DEFINITIONS = {
-  '其他生產技術': '未歸類於其他分類的生產製程技術',
-  '能源來源轉換與電氣化': '以電力或替代能源取代化石燃料的製程轉換',
-  '牆體、屋頂與建築立面': '應用於建築外殼（牆面、屋頂、立面）的節能技術',
-  '燃燒與轉化': '燃料燃燒或轉化為其他能源形式的製程',
-  '生質柴油與生質航煤': '以生質原料製造的柴油與航空燃料',
-  '回收再利用': '材料或產品的回收再利用技術',
-  '電力加熱': '以電力做為熱源的加熱技術',
-  '搭配 CCUS': '設計上支援碳捕捉、利用與封存的技術',
-  '採用碳捕捉技術': '製程中附加碳捕捉功能的技術',
-  '燃料供熱': '以燃料燃燒做為熱源的加熱技術',
-  '加工': '原料轉換為中間產品的加工製程',
-  '建築能源管理系統': '監控並優化建築能源使用效率的系統',
-  '甲烷排放監測與減排': '偵測並降低甲烷洩漏排放的技術',
-  '生質甲烷': '以生質原料製造、可替代天然氣的甲烷燃料',
-  '太陽光電': '太陽能板直接把光轉換成電的技術',
-  '直接還原鐵（DRI）': '不經高爐、直接以氫氣或天然氣還原鐵礦的煉鐵製程',
-  '電動車': '以電池或電動馬達驅動的車輛',
-  '其他零組件': '未歸類於其他分類的零組件技術',
-  '磁約束核融合': '利用磁場侷限電漿以達成核融合反應的技術',
-  '潛熱（相變材料）': '利用材料相變（如固轉液）吸放熱的儲熱技術',
-  '容量管理': '調節電網或系統供需容量的管理技術',
-  '其他熱泵技術': '未歸類於其他分類的熱泵技術',
-  '鋰基電池': '以鋰離子為主要儲能介質的電池技術',
-  '空氣源熱泵': '從空氣中擷取熱能來加熱或冷卻的熱泵',
-  '鐵路': '鐵路運輸相關的淨零技術',
-  '海洋能': '利用海洋潮汐、波浪、溫差等能量發電的技術',
-  '鑽井': '鑽探地下資源（如地熱、油氣）的工程技術',
-  '小型模組化反應爐': '模組化生產、規模較小的新型核反應爐',
-  '氫氣輸配': '將氫氣輸送與配送至用戶端的基礎設施',
-  '區域供熱熱能儲存': '區域供熱系統中儲存並調度熱能的技術',
-  '機械儲能': '以機械方式（如抽蓄水力、飛輪）儲存能量的技術',
-  '建築端熱能儲存': '在單一建築內儲存熱能的技術',
-  '控制系統與監測': '監測與自動控制能源系統運作的技術',
-  '濕法冶金': '以水溶液化學方式提煉金屬的製程',
-  '高價值化學品': '石化業中附加價值較高的化學品產製',
-  '甲醇': '以再生能源或替代原料製造的甲醇燃料',
-  '碳捕捉與利用': '捕捉二氧化碳後再利用製成其他產品的技術',
-  '照明技術與控制系統': '節能照明設備與其控制系統',
-  '減少材料損耗': '降低生產過程中材料浪費的技術',
-  '固態設備冷卻': '以固態元件（無傳統冷媒循環）進行設備冷卻的技術',
-  '航空器': '航空器本身的淨零相關技術',
-  '航空器零組件': '設備或系統的組成零件技術',
-  '其他電池技術': '未歸類於其他分類的電池技術',
-  '氫燃料電池電動車（FCEV）': '以氫燃料電池發電驅動的電動車',
-  '先進燃燒引擎與動力系統': '效率提升或排放降低的新型燃燒引擎與傳動系統',
-  '風力': '利用風力發電的技術',
-  '生質乙醇': '以生質原料發酵製成的乙醇燃料',
-  '地熱能地面作業': '地熱發電廠地面端的設備與作業技術',
-  '地下儲存': '利用地下空間（如鹽穴、含水層）儲存氣體或能源的技術',
-  '氫氣直接利用': '氫氣不經轉換、直接做為燃料使用的應用',
-  '熱裂解': '在無氧或低氧環境下以高溫分解原料的製程',
-  '電化學儲能': '以電池等電化學方式儲存電能的技術',
-  '電纜回收': '廢棄電纜的材料回收技術',
-  '製造': '產品製造相關的淨零技術',
-  '替代製程路徑': '傳統製程之外的替代生產路徑',
-  '熱催化': '以熱能驅動、搭配觸媒進行化學反應的製程',
-  '資源循環（將廢棄物轉化為化學品與生質能）': '將廢棄物轉化為化學品或生質能的回收技術',
-  '門窗': '建築門窗的節能設計與技術',
-  '熱驅動式熱泵': '以熱能（而非電力）驅動的熱泵技術',
-  '氫動力航空器零組件': '以氫能驅動的飛機零組件技術',
-  '氫氣燃料車輛': '以氫氣為燃料的車輛',
-  '充電與加注': '電動或氫能車輛的充電、加氣基礎設施',
-  '煉製、運輸與儲存': '燃料的煉製、運輸與儲存相關技術',
-  '太陽熱能': '利用鏡面或集熱器把太陽能轉換成熱能的技術',
-  '燃料循環前端': '核燃料循環中，鈾礦開採至製成燃料棒前的階段',
-  '替代方案': '傳統技術之外的替代解決方案',
-  '液態燃料': '以液態形式儲存與使用的替代燃料',
-  '調質製程': '產品或原料前處理、調整性質的製程',
-  '氫基燃料應用': '以氫氣為基礎製成的燃料（如氨、合成燃料）之應用',
-  '電解槽設計': '以電解水製氫的設備設計技術',
-  '其他': '未歸類於其他分類的技術',
-  '電纜與導體': '電力傳輸用的電纜與導體技術',
-  '其他封存技術': '未歸類於其他分類的能源儲存技術',
-  '前處理與拆解': '回收物料的前置處理與拆解技術',
-  '生質燃料': '以生質原料製成的替代燃料',
-  '其他能源': '未歸類於其他分類的能源來源',
-  '建築設計工具': '協助建築節能設計的軟體或工具',
-  '輕量化': '降低產品或載具重量以提升能源效率的技術',
-  '牆面、屋頂與建築立面太陽熱能技術': '整合於建築外殼的太陽能熱技術',
-  '空調機': '建築空間冷氣/空調設備',
-  '蒸發冷卻': '利用水分蒸發帶走熱量的冷卻技術',
-  '地源與水源熱泵': '從地下或水體擷取熱能的熱泵技術',
-  '其他建築冷暖技術': '未歸類於其他分類的建築冷暖技術',
-  '多聯供系統': '同時產出電力、熱能等多種能源產物的系統',
-  '次世代金屬電池': '鋰離子之外、新型態的金屬電池技術',
-  '電動車充電設備': '電動車專用的充電設備',
-  '加氫與基礎設施': '氫能或替代燃料車輛的加氣基礎設施',
-  '引擎': '動力來源的引擎技術',
-  '船舶營運': '船舶航行與營運相關的減碳技術',
-  '搭配二氧化碳捕捉': '製程中附加二氧化碳捕捉功能的技術',
-  '次世代地熱能源系統': '突破傳統地質限制的新型地熱發電技術',
-  '大型反應爐': '傳統規模的大型核反應爐',
-  '核融合': '使原子核融合釋放能量的發電技術',
-  '慣性約束核融合': '以雷射等方式瞬間壓縮燃料以達成核融合的技術',
-  '合成燃料生產': '以氫氣與二氧化碳等原料合成的人造燃料',
-  '地上儲存': '地面設施的能源或氣體儲存技術',
-  '氫氣海運': '以船舶運輸氫氣（或其衍生物）的技術',
-  '地質氫': '自然存在於地層中、可開採的氫氣資源',
-  '潛熱儲存': '利用材料相變儲存熱能的技術',
-  '顯熱儲存': '以物質溫度變化（不改變相態）儲存熱能的技術',
-  '熱化學儲熱': '利用可逆化學反應儲存與釋放熱能的技術',
-  '變壓與電力轉換': '電力形式轉換（如交直流轉換）的技術',
-  '直接空氣捕捉': '直接從大氣中捕捉二氧化碳的技術',
-  '礦物封存': '將二氧化碳固化封存於礦物中的技術',
-  '二氧化碳運輸': '捕捉後的二氧化碳輸送至封存地點的技術',
-  '採礦與開採': '原物料的開採與萃取技術',
-  '生物技術': '以生物程序（如微生物、酵素）進行轉化的技術',
-  '苯、甲苯及二甲苯': '石化業重要中間原料（BTX）之生產技術',
-  '乙烯': '石化業基礎原料乙烯的生產技術',
-  '電力': '電力生產與應用相關技術',
-  '建築生質能供暖': '以生質燃料為建築供暖的技術',
-  '電池交換': '以更換整組電池取代充電的電動車能源補充方式',
-  '需量反應': '依電網供需狀況調整用電行為的技術',
-  '動態充電或電動道路系統': '車輛行駛中即時充電的道路系統',
-  '燃料電池電動車用氫燃料電池': '專用於氫燃料電池車的燃料電池技術',
-  '氫基技術': '以氫氣為核心的相關技術',
-  '清潔燃料船用內燃機': '使用低碳燃料的船舶內燃引擎',
-  '燃料電池電動船舶': '以燃料電池驅動的船舶',
-  '船舶': '船舶本身的淨零相關技術',
-  '天然氣發電（搭配 CCUS）': '天然氣發電廠附加碳捕捉、利用與封存的技術',
-  '探勘與生產': '資源（如地熱、油氣）的探勘與生產技術',
-  '核燃料循環': '核燃料從開採、使用到後端處理的完整循環',
-  '燃料循環後端': '核燃料循環中，用過燃料的處理與最終處置階段',
-  '材料型儲氫': '以特定材料（如金屬氫化物）儲存能源的技術',
-  '新型原料': '傳統原料之外的新型生產原料',
-  '熱化學水分解': '以高溫化學反應將水分解製氫的技術',
-  '其他精煉方法': '未歸類於其他分類的精煉方法',
-  '其他供熱方式': '未歸類於其他分類的加熱方式',
-  '營運': '系統或設施的營運管理技術',
-  '其他車輛': '未歸類於其他分類的車輛技術',
-  '水力發電': '利用水流發電的技術',
-  '熱製程': '利用熱能進行的工業製程'
+  '其他生產技術': '未歸入其他既有分類的生產方法。',
+  '能源來源轉換與電氣化': '以較潔淨能源及電力取代既有燃料。',
+  '牆體、屋頂與建築立面': '構成建築物非透明外殼的外部構件。',
+  '燃燒與轉化': '將燃料轉化為熱能或其他能源的製程。',
+  '生質柴油與生質航空燃油': '以生質原料製成的柴油與航空燃油。',
+  '回收再利用': '回收並重新處理材料以供再次利用。',
+  '電力加熱': '將電能轉換為熱能的加熱方式。',
+  '採用 CCUS 技術': '採用碳捕捉、再利用與封存技術。',
+  '採用碳捕捉技術': '配備捕捉碳排放的相關技術。',
+  '燃料供熱': '透過燃料燃燒產生熱能的供熱方式。',
+  '加工': '將材料處理成可用產品或中間產物。',
+  '建築能源管理系統': '監測並最佳化建築能源使用的系統。',
+  '甲烷排放監測與減量': '偵測、量測並減少甲烷排放的技術。',
+  '生質甲烷': '以生質原料製成的富甲烷氣體。',
+  '太陽光電': '將太陽光直接轉換為電力的技術。',
+  '直接還原鐵（DRI）': '在不熔融礦石下還原製成的鐵。',
+  '電動車': '完全或部分以電力驅動的車輛。',
+  '其他零組件': '未歸入其他既有分類的零組件。',
+  '磁約束核融合': '利用磁場約束高溫電漿的核融合技術。',
+  '潛熱（相變材料）': '材料相變時吸收或釋放的熱能。',
+  '容量管理': '依需求變化管理系統可用容量。',
+  '其他熱泵技術': '未歸入其他既有分類的熱泵技術。',
+  '鋰基電池': '電化學系統中使用鋰的電池。',
+  '空氣源熱泵': '與室外空氣交換熱能的熱泵。',
+  '鐵路': '利用鐵路運送旅客或貨物。',
+  '海洋能': '從波浪、潮汐、海流或海洋熱能取得的能源。',
+  '地熱鑽井': '鑽設井孔以探勘及取得地熱資源。',
+  '小型模組化反應爐': '單機容量不超過 300 MWe 的模組化核子反應爐。',
+  '氫氣輸配': '將氫氣輸送及配送至終端用戶。',
+  '區域供熱熱能儲存': '整合於區域供熱管網的熱能儲存系統。',
+  '機械儲能': '以機械能或位能形式儲存能量。',
+  '建築端熱能儲存': '設置於建築端的熱能儲存系統。',
+  '控制與監測系統': '控制作業並監測設備效能的系統。',
+  '濕法冶金': '利用水溶液提取及回收金屬的製程。',
+  '高價值化學品': '具較高經濟價值或特殊用途的化學品。',
+  '甲醇': '用作化工原料、燃料或能源載體的化學品。',
+  '採用碳捕捉與利用技術': '捕捉二氧化碳並將其作為原料利用。',
+  '照明技術與控制系統': '高效率照明設備及其運轉控制系統。',
+  '減少材料損耗': '減少材料在生產及使用過程中的耗損。',
+  '固態冷卻設備': '利用固態材料熱效應進行冷卻的設備。',
+  '航空器': '用於空中飛行的運具。',
+  '航空器零組件': '構成航空器的零件與子系統。',
+  '其他電池技術': '未歸入其他電池分類的技術。',
+  '氫燃料電池電動車（FCEV）': '以氫燃料電池供電的電動車。',
+  '先進燃燒引擎與動力系統': '提升效率並降低排放的引擎與動力系統。',
+  '風力': '將風的動能轉換而取得的能源。',
+  '生質乙醇': '以生質原料製成的乙醇燃料。',
+  '地熱能地面作業': '利用地面設備處理地熱流體並產生能源的作業。',
+  '地下儲氫': '將大量氫氣儲存於地下地質構造。',
+  '氫氣直接利用': '直接將氫氣用作燃料或工業原料。',
+  '熱裂解': '在缺氧或無氧條件下加熱分解材料。',
+  '電化學儲能': '利用可逆電化學反應儲存能量。',
+  '電纜回收': '從廢電纜回收金屬及其他材料。',
+  '製造': '生產材料、零組件或成品的作業。',
+  '替代製程路徑': '採用替代製程或原料的生產路徑。',
+  '熱催化': '結合熱能與觸媒進行化學轉化。',
+  '資源循環（將廢棄物轉化為化學品與生質能）': '將廢棄物轉化為化學品、燃料或生質能。',
+  '門窗系統': '建築物的窗戶、玻璃門及天窗等開口系統。',
+  '熱驅動式熱泵': '主要以熱能驅動的熱泵。',
+  '氫動力航空器零組件': '為氫動力航空器設計的零組件。',
+  '氫燃料車輛': '以燃料電池或燃燒方式使用氫氣驅動的車輛。',
+  '充電與燃料加注': '為運具補充電力或燃料。',
+  '煉製、運輸與儲存': '煉製、運輸及儲存燃料或能源載體。',
+  '太陽熱能': '將太陽輻射轉換為可利用熱能的技術。',
+  '核燃料循環前端': '核燃料進入反應爐前的製備階段。',
+  '替代方案': '不同於傳統技術的替代方法。',
+  '液態燃料': '用於產生熱能或動力的液態物質。',
+  '氫氣調質製程': '調整氫氣純度、壓力或狀態以利輸儲及使用。',
+  '氫基燃料應用': '使用以氫氣製成的氨或合成碳氫燃料。',
+  '電解槽設計': '以電力製氫之電解槽與系統設計。',
+  '其他': '未歸入其他既有分類的技術。',
+  '電纜與導體': '用於輸送及配電的電纜與導電元件。',
+  '其他封存技術': '用於監測或將二氧化碳封存於地質構造的其他技術。',
+  '前處理與拆解': '在材料回收前進行產品處理及拆解。',
+  '生質燃料': '直接或間接以生質原料製成的燃料。',
+  '其他能源': '未歸入其他既有分類的能源來源。',
+  '建築設計工具': '用於設計及評估建築效能的工具。',
+  '輕量化': '在維持必要性能下減輕產品重量。',
+  '牆面、屋頂與建築立面太陽熱能技術': '整合於牆面、屋頂或建築立面的太陽熱能系統。',
+  '空調設備': '調節室內溫度與空氣狀態的設備。',
+  '蒸發冷卻': '利用水分蒸發吸熱的冷卻方式。',
+  '地源與水源熱泵': '與土壤、地下水或水體交換熱能的熱泵。',
+  '其他建築冷暖技術': '未歸入其他分類的建築供暖與冷房技術。',
+  '多聯供系統': '整合生產多種能源產品的系統。',
+  '次世代金屬電池': '採用新興金屬電化學體系的先進電池。',
+  '電動車充電設備': '為電動車供應電力的充電設備。',
+  '加氫與基礎設施': '為車輛加注氫氣及其相關基礎設施。',
+  '引擎': '將能源轉換為機械動力的設備。',
+  '船舶營運': '船舶航行、操作及維護的相關作業。',
+  '搭配二氧化碳捕捉': '配備捕捉二氧化碳排放的技術。',
+  '次世代地熱能源系統': '突破傳統資源限制以取得地熱的先進系統。',
+  '大型反應爐': '電力容量超過 700 MW 的核子反應爐。',
+  '核融合': '藉由輕原子核融合反應產生能量。',
+  '慣性約束核融合': '藉由快速壓縮燃料靶丸實現核融合。',
+  '合成燃料生產': '透過化學合成製造燃料。',
+  '地上儲存': '將能源載體儲存於地面設施。',
+  '氫氣海運': '以船舶運輸氫氣或氫載體。',
+  '地質氫': '從天然聚積中開採或於地質構造內生成的氫氣。',
+  '潛熱儲存': '利用材料相變儲存及釋放熱能。',
+  '顯熱儲存': '藉由改變材料溫度來儲存熱能。',
+  '熱化學儲熱': '利用可逆化學反應儲存及釋放熱能。',
+  '變壓與電力轉換': '執行電壓變換、電力轉換及電力潮流控制的技術。',
+  '直接空氣捕捉': '直接從環境空氣中捕捉二氧化碳。',
+  '礦物封存': '將二氧化碳轉化為穩定碳酸鹽礦物的永久封存方式。',
+  '二氧化碳運輸': '將捕捉的二氧化碳運往利用或封存地點。',
+  '採礦與開採': '從地層中取得礦產資源的作業。',
+  '生物技術': '利用生物、細胞或酵素進行的技術。',
+  '苯、甲苯及二甲苯': '用作燃料成分及化工原料的芳香族烴。',
+  '乙烯': '主要用於製造塑膠的基礎化學品。',
+  '電力': '藉由電荷流動傳輸的能源。',
+  '建築生質能供暖': '利用生質能供應建築物熱能。',
+  '電池交換': '將低電量電池更換為已充電電池。',
+  '需量反應': '依電網訊號調整用電量或用電時間。',
+  '動態充電或電動道路系統': '在車輛行駛期間供應電力的道路系統。',
+  '燃料電池電動車用氫燃料電池': '專為電動車供電設計的氫燃料電池。',
+  '氫基技術': '生產、處理或使用氫氣的相關技術。',
+  '清潔燃料船用內燃機': '使用低排放或清潔燃料的船用內燃機。',
+  '燃料電池電動船舶': '以燃料電池發電並由電力推進的船舶。',
+  '船舶': '用於水上運送旅客或貨物的運具。',
+  '天然氣發電（搭配 CCUS）': '採用碳捕捉、再利用與封存的天然氣發電。',
+  '油氣探勘與生產': '探尋、評估及開採石油與天然氣的作業。',
+  '核燃料循環': '從核燃料製備至最終廢棄物管理的完整流程。',
+  '核燃料循環後端': '核燃料使用後的管理階段。',
+  '材料型儲氫': '利用氫化物、吸附材料或化學載體儲存氫氣。',
+  '新型原料': '用於生產的新興或替代性原料。',
+  '熱化學水分解': '利用高溫及化學反應分解水以製取氫氣。',
+  '其他精煉方法': '未歸入其他既有分類的精煉方法。',
+  '其他供熱方式': '未歸入其他既有分類的供熱方式。',
+  '航空營運': '航空器運航及地面移動的相關作業。',
+  '其他車輛': '未歸入其他既有分類的車輛。',
+  '水力發電': '利用水流能量產生電力。',
+  '熱製程': '主要利用熱能進行的工業製程。'
+};
+
+// English-mode counterpart to SECTOR_DEFINITIONS above — keyed by the exact
+// sector_en string (not sector_zh), since the locked-segment summary looks
+// up by whichever field the current uiLang displays. Being filled in
+// gradually in batches (unlike SECTOR_DEFINITIONS, which was written in one
+// pass) — sector_zh values with no entry here yet simply show no definition
+// clause in English mode, same graceful-omission behavior as an unrated
+// adoption_stage. IMPORTANT: keys must match the dataset's actual sector_en
+// spelling, including its existing typos (e.g. "powetrains", not
+// "powertrains") — a corrected spelling here would silently never match.
+const SECTOR_DEFINITIONS_EN = {
+  'Aboveground storage': 'Storage of energy carriers in aboveground facilities.',
+  'Advanced combustion engines and powetrains': 'Efficient, low-emission engine and powertrain technologies.',
+  'Aircrafts': 'Vehicles designed for flight.',
+  'Alternative approaches': 'Methods different from conventional technical solutions.',
+  'Alternative routes': 'Production pathways using alternative processes or inputs.',
+  'Battery swapping': 'Replacing a depleted battery with a charged one.',
+  'Benzene, toluene and xylenes': 'Aromatic hydrocarbons used as fuels and chemical feedstocks.',
+  'Bioethanol': 'Ethanol fuel produced from biomass.',
+  'Biofuels': 'Fuels produced directly or indirectly from biomass.',
+  'Biological': 'Processes using organisms, cells or enzymes.',
+  'Biomethane': 'Methane-rich gas produced from biomass.',
+  'Building design tools': 'Tools for designing and evaluating building performance.',
+  'Building energy management systems': 'Systems that monitor and optimise building energy use.',
+  'Building heating from bioenergy': 'Building heating supplied by bioenergy.',
+  'Building-level thermal storage': 'Thermal energy storage installed within a building.',
+  'Air conditioners': 'Equipment used to cool and condition indoor air.',
+  'Back-end of the fuel cycle': 'Management of spent nuclear fuel after reactor use.',
+  'Biodiesel and biokerosene': 'Diesel and aviation fuels produced from biomass.',
+  'CCUS-enabled': 'Equipped with carbon capture, utilisation and storage.',
+  'CO2 transport': 'Transport of captured CO2 to utilisation or storage sites.',
+  'Cable recycling': 'Recovery of metals and materials from discarded cables.',
+  'Cables and conductors': 'Components used to transmit and distribute electricity.',
+  'Capacity management': 'Management of system capacity to meet changing demand.',
+  'Clean-fuel internal combustion ship engines': 'Ship engines powered by low-emission or clean fuels.',
+  'Combustion and conversion': 'Processes that convert fuels into heat or other energy forms.',
+  'Components': 'Parts and subsystems used in aircraft.',
+  'Charging and refuelling': 'Supplying electricity or fuel to vehicles.',
+  'Control systems and monitoring': 'Systems that control operations and monitor performance.',
+  'Conditioning processes': 'Processes that prepare hydrogen for transport, storage or use.',
+  'Demand response': 'Adjustment of electricity demand in response to grid signals.',
+  'Direct air capture': 'Capture of carbon dioxide directly from ambient air.',
+  'Direct reduced iron (DRI)': 'Iron produced by reducing iron ore without melting it.',
+  'Direct use of hydrogen': 'Direct use of hydrogen as a fuel or feedstock.',
+  'District heating thermal storage': 'Thermal storage integrated with a district heating network.',
+  'Dynamic charging or electric road system': 'Road systems that supply electricity to moving vehicles.',
+  'EV charging equipment': 'Equipment that supplies electricity to electric vehicles.',
+  'Electric vehicle (EV)': 'A vehicle powered partly or entirely by electricity.',
+  'Electrical heating': 'Production of heat using electrical energy.',
+  'Drilling': 'Drilling wells to explore and access geothermal resources.',
+  'Electricity': 'Energy transferred through the flow of electric charge.',
+  'Electrochemical storage': 'Energy storage based on reversible electrochemical reactions.',
+  'Electrolyser design': 'Design of systems that use electricity to produce hydrogen.',
+  'Engines': 'Machines that convert energy into mechanical power.',
+  'Ethylene': 'A basic chemical used mainly to produce plastics.',
+  'Evaporative cooling': 'Cooling achieved through the evaporation of water.',
+  'Fuel cell electric ship': 'A ship propelled by electricity generated from fuel cells.',
+  'Exploration and production': 'Activities for locating, assessing and extracting oil and natural gas.',
+  'Fenestration': 'Building openings such as windows, glazed doors and skylights.',
+  'Front-end of the fuel cycle': 'Processes that prepare nuclear fuel for reactor use.',
+  'Fuel-based heating': 'Heating produced through the combustion of fuels.',
+  'Fusion': 'Energy production by combining light atomic nuclei.',
+  'Geologic hydrogen': 'Hydrogen extracted from natural accumulations or generated within geological formations.',
+  'Ground-source and water-source heat pumps': 'Heat pumps that exchange heat with the ground or water.',
+  'H2 shipping': 'Maritime transport of hydrogen or hydrogen carriers.',
+  'H2 transmission and distribution': 'Transmission and distribution of hydrogen to end users.',
+  'High value chemicals': 'Chemicals with high economic value or specialised uses.',
+  'Hydrogen based technologies': 'Technologies that produce, handle or use hydrogen.',
+  'Hydrogen fuel cell electric vehicles (FCEVs)': 'Electric vehicles powered by hydrogen fuel cells.',
+  'Hydrogen fuel cell for FCEVs': 'Hydrogen fuel cells designed to power electric vehicles.',
+  'Hydrogen-powered aircraft components': 'Aircraft components designed for hydrogen-powered flight.',
+  'Hydrometallurgy': 'Metal extraction and recovery using aqueous solutions.',
+  'Hydropower': 'Electricity generation using the energy of flowing water.',
+  'Inertial confinement fusion': 'Fusion achieved by rapidly compressing a fuel target.',
+  'Large reactors': 'Nuclear reactors with an electrical capacity above 700 MW.',
+  'Latent heat (phase change material)': 'Heat absorbed or released during a material phase change.',
+  'Latent heat storage': 'Thermal storage using the phase change of a material.',
+  'Lighting technologies and control systems': 'Efficient lighting equipment and systems that control its operation.',
+  'Lightweighting': 'Reducing product weight while maintaining required performance.',
+  'Liquid fuels': 'Liquid materials used to produce heat or power.',
+  'Lithium based batteries': 'Batteries that use lithium in their electrochemical system.',
+  'Magnetic confinement fusion': 'Fusion using magnetic fields to confine hot plasma.',
+  'Manufacturing': 'Production of materials, components or finished products.',
+  'Materials-based storage': 'Hydrogen storage using hydrides, sorbents or chemical carriers.',
+  'Mechanical storage': 'Energy storage using mechanical or potential energy.',
+  'Methanol': 'A chemical used as a feedstock, fuel or energy carrier.',
+  'Mineral storage': 'Permanent CO2 storage through formation of stable carbonate minerals.',
+  'Mining and extraction': 'Activities that remove mineral resources from the earth.',
+  'Next-generation geothermal energy systems': 'Advanced systems that access geothermal heat beyond conventional resources.',
+  'Next-generation metal batteries': 'Advanced batteries using emerging metal-based chemistries.',
+  'Novel feedstock': 'New or alternative raw materials used in production.',
+  'Nuclear fuel cycles': 'Processes from nuclear fuel preparation to final waste management.',
+  'Ocean': 'Energy obtained from waves, tides, currents or ocean heat.',
+  'Other': 'Technologies not included in another defined category.',
+  'Other batteries technologies': 'Battery technologies not included in other battery categories.',
+  'Other building heating and cooling technologies': 'Building heating and cooling technologies not otherwise classified.',
+  'Other components': 'Components not included in another defined category.',
+  'Other heat pumps technologies': 'Heat pump technologies not included in another category.',
+  'Other heating': 'Heating methods not included in another category.',
+  'Other production techniques': 'Production methods not included in another category.',
+  'Other refining methods': 'Refining methods not included in another category.',
+  'Other sources': 'Energy sources not included in another category.',
+  'Other storage technologies': 'Additional technologies for monitoring or storing CO2 in geological formations.',
+  'Other vehicles': 'Vehicle types not included in another category.',
+  'Photovoltaic': 'Technology that converts sunlight directly into electricity.',
+  'Polygeneration systems': 'Integrated systems that produce multiple energy products.',
+  'Power generation from natural gas, with CCUS': 'Natural gas power generation equipped with CCUS.',
+  'Pre-processing and disassembly': 'Preparation and dismantling of products before material recovery.',
+  'Processing': 'Treatment of materials into usable products or intermediates.',
+  'Pyrolysis': 'Thermal decomposition of materials with little or no oxygen.',
+  'Rail': 'Transport of passengers or freight by rail.',
+  'Recycling': 'Recovery and reprocessing of materials for further use.',
+  'Recycling (waste product conversion to chemicals and bioenergy)': 'Conversion of waste into chemicals, fuels or bioenergy.',
+  'Reducing material losses': 'Measures that minimise material waste during production and use.',
+  'Refining, transport and storage': 'Processing, transporting and storing fuels or energy carriers.',
+  'Refueling and infrastructure': 'Hydrogen refuelling systems and their supporting infrastructure.',
+  'Sensible heat storage': 'Thermal storage achieved by changing a material’s temperature.',
+  'Shift in energy sources and electrification': 'Replacement of existing fuels through cleaner energy sources and electricity.',
+  'Small modular reactors': 'Factory-built modular reactors with capacity up to 300 MWe.',
+  'Solar thermal': 'Technology that converts solar radiation into usable heat.',
+  'Solar thermal technologies for wall, roof & façades': 'Solar thermal systems integrated into building walls, roofs or façades.',
+  'Surface operations for geothermal energy': 'Surface processes and equipment used to produce geothermal energy.',
+  'Sythetic fuels production': 'Production of fuels through chemical synthesis.',
+  'Thermal processes': 'Industrial processes driven primarily by heat.',
+  'Thermally-driven heat pump': 'A heat pump driven mainly by thermal energy.',
+  'Thermocatalytic': 'Chemical conversion using heat and a catalyst.',
+  'Thermochemical heat storage': 'Thermal storage using reversible chemical reactions.',
+  'Thermochemical water splitting': 'Hydrogen production by splitting water with heat and chemical reactions.',
+  'Transformation and conversion': 'Technologies that transform voltage, convert power and control electricity flows.',
+  'Use of hydrogen-based fuels': 'Use of ammonia or synthetic hydrocarbons produced from hydrogen.',
+  'Vessel operations': 'Activities involved in operating and maintaining ships.',
+  'Vessels': 'Waterborne vehicles used to transport passengers or cargo.',
+  'Wall, roof & façade': 'External building components forming the opaque envelope.',
+  'Wind': 'Energy obtained by converting the motion of wind.',
+  'With CO2 capture': 'Equipped to capture carbon dioxide emissions.',
+  'With carbon capture': 'Equipped with technology that captures carbon emissions.',
+  'With carbon capture and usage': 'Equipped to capture carbon dioxide and use it as an input.',
+  'Underground storage': 'Large-scale hydrogen storage in underground geological formations.',
+  'Solid-state equipment cooling': 'Cooling equipment based on solid-state caloric effects.',
+  'Operations': 'Activities involved in aircraft operation and ground movement.',
+  'Methane emissions monitoring and abatement': 'Technologies that detect, measure and reduce methane emissions.',
+  'Hydrogen-fuelled vehicules': 'Vehicles powered by hydrogen through fuel cells or combustion.',
+  'Air-source heat pumps': 'Heat pumps that exchange heat with outdoor air.',
+};
+
+// One-line definitions for intermediate breadcrumb keywords (path segments
+// above the leaf sector, e.g. "Industry > Aluminium > ..." — "Aluminium" is
+// intermediate here, not a sector_zh leaf). Keyed by the English keyword
+// (not zh) because these terms come from SECTOR_TRANSLATIONS, which is also
+// English-keyed, and don't carry the "always-unique leaf" guarantee that
+// sector_zh has. Not yet wired into any UI surface.
+const SECTOR_PATH_DEFINITIONS_ZH = {
+  'Aluminium': '鋁及其合金的生產與加工。',
+  'Ammonia': '用作化工原料、肥料及能源載體的化學品。',
+  'Aviation': '使用航空器運送旅客或貨物的運輸活動。',
+  'Battery recycling': '從生產廢料及廢電池中回收可用材料。',
+  'Bioenergy': '由生質原料及有機廢棄物產生的能源。',
+  'Biogases and biomethane production': '利用有機原料生產沼氣及生質甲烷。',
+  'Building envelope materials': '控制建築外殼熱量、空氣及濕氣傳遞的材料。',
+  'Building envelope technologies': '改善建築外殼能源效能的技術。',
+  'Buildings': '涵蓋住宅及服務業建築能源使用與技術的部門。',
+  'CO2 capture': '從排放源或環境空氣中分離二氧化碳。',
+  'CO2 storage': '將捕捉的二氧化碳永久封存於適當地質構造。',
+  'Carbon Capture and Storage': '捕捉、運輸並永久封存二氧化碳的技術鏈。',
+  'Cement and concrete': '水泥、混凝土及相關營建材料的生產。',
+  'Chemicals and plastics': '化學品、高分子材料及塑膠產品的生產。',
+  'Coal': '從地質礦床開採的富碳化石燃料。',
+  'Cooking technologies': '為食物烹調提供能源的設備與系統。',
+  'Critical minerals': '能源技術不可或缺且具有供應風險的礦產資源。',
+  'Cross-cutting recycling': '可應用於多種產品與材料的回收技術。',
+  'Design and envelope': '降低建築能源需求的設計與外殼措施。',
+  'E-waste recycling': '從廢棄電氣與電子設備中回收可用材料。',
+  'Electric vehicle battery (electrical storage)': '儲存電力並為電動車提供動力的充電式電池。',
+  'Electrolysis': '利用電力驅動化學反應的製程。',
+  'Energy networks and storage': '輸送、管理及儲存能源的基礎設施。',
+  'Fission': '重原子核分裂並釋放能量的反應。',
+  'Fossil fuels': '由古代有機物形成的煤炭、石油及天然氣。',
+  'Geothermal': '從地球內部熱能取得的能源。',
+  'H2 infrastructure': '用於氫氣運輸、配送及供應的基礎設施。',
+  'H2 storage': '將氫氣保存至後續使用的儲存技術。',
+  'Heating, cooling and ventilation technologies': '調節室內溫度、通風及空氣品質的技術。',
+  'High temperature': '需要高溫熱能的工業製程。',
+  'Hydrogen': '涵蓋氫氣生產、基礎設施及應用的能源領域。',
+  'Hydrogen use in road transport': '使用氫氣為公路車輛提供動力。',
+  'Industrial heating': '為工業生產製程供應熱能。',
+  'Industry': '製造材料、中間產品及成品的產業部門。',
+  'Iron and steel': '鐵與鋼材的生產及加工。',
+  'Liquid biofuels production': '利用生質原料或廢棄物生產液態燃料。',
+  'Low to medium temperature': '需要中低溫熱能的工業製程。',
+  'Metallic products': '使用金屬製造產品及零組件。',
+  'Mineral processing and refining': '將礦石加工成純化礦物、金屬或材料。',
+  'Nuclear': '透過受控核反應產生的能源。',
+  'Oil and Gas': '涵蓋石油與天然氣探勘、生產及處理的產業。',
+  'Operations and equipment': '石油與天然氣設施的營運作業及設備。',
+  'Physical grids': '用於輸電及配電的實體基礎設施。',
+  'Power generation': '使用氫氣或氫基燃料產生電力。',
+  'Power generation from biomass': '使用生質原料或有機廢棄物產生電力。',
+  'Production': '利用水、燃料或其他資源生產氫氣的製程。',
+  'Propulsion': '產生動力或推力以驅動船舶的系統。',
+  'Pulp and paper': '紙漿、紙張及相關產品的生產。',
+  'Renewables': '來自可自然持續補充來源的能源。',
+  'Road transport': '使用道路車輛運送旅客或貨物。',
+  'Shipping': '使用船舶經海洋或內陸水道運送旅客或貨物。',
+  'Smart grids': '運用數位監測、通訊與控制技術管理電力的電網。',
+  'Solar': '從太陽輻射取得的能源。',
+  'Subsurface operations for geothermal energy': '探勘、開發及管理地下地熱資源的作業。',
+  'Transport': '涵蓋旅客與貨物運送的部門。',
+  'digital and tools': '支援能源系統運作的數位技術與分析工具。',
+  'large-scale or industrial': '為大容量或工業應用所設計的技術。',
+  'mass-manufactured': '以標準化單元進行大量製造的技術。',
+  'Thermal storage': '以熱或冷的形式儲存能量，供後續使用。',
+  'Thermal storage for buildings and district heating': '為建築或區域供熱管網提供的熱能儲存技術。',
+  'Building-level thermal storage': '設置於建築端的熱能儲存系統。',
+  'Combustion and conversion': '將燃料轉化為熱能或其他能源的製程。',
+  'Components': '構成航空器的零件與子系統。',
+  'EV charging equipment': '為電動車供應電力的充電設備。',
+  'Nuclear fuel cycles': '從核燃料製備至最終廢棄物管理的完整流程。',
+  'Other components': '未歸入其他既有分類的零組件。',
+  'Thermal processes': '主要利用熱能進行的工業製程。',
+  'Fusion': '藉由輕原子核融合反應產生能量。',
+  'Sythetic fuels production': '透過化學合成製造燃料。',
+};
+
+const SECTOR_PATH_DEFINITIONS_EN = {
+  'Aluminium': 'Production and processing of aluminium and its alloys.',
+  'Ammonia': 'A chemical used as a feedstock, fertiliser and energy carrier.',
+  'Aviation': 'Transport of passengers or cargo by aircraft.',
+  'Battery recycling': 'Recovery of materials from production scrap and used batteries.',
+  'Bioenergy': 'Energy produced from biomass and organic waste.',
+  'Biogases and biomethane production': 'Production of biogases and biomethane from organic feedstocks.',
+  'Building envelope materials': 'Materials that control heat, air and moisture through building envelopes.',
+  'Building envelope technologies': 'Technologies that improve building-envelope energy performance.',
+  'Buildings': 'The sector covering energy use and technologies in residential and service buildings.',
+  'CO2 capture': 'Separation of CO2 from emission sources or ambient air.',
+  'CO2 storage': 'Permanent storage of captured CO2 in suitable geological formations.',
+  'Carbon Capture and Storage': 'Capture, transport and permanent storage of carbon dioxide.',
+  'Cement and concrete': 'Production of cement, concrete and related construction materials.',
+  'Chemicals and plastics': 'Production of chemicals, polymers and plastic products.',
+  'Coal': 'A carbon-rich fossil fuel extracted from geological deposits.',
+  'Cooking technologies': 'Equipment and systems that provide energy for cooking.',
+  'Critical minerals': 'Minerals essential to energy technologies and exposed to supply risks.',
+  'Cross-cutting recycling': 'Recycling technologies applicable across multiple products and materials.',
+  'Design and envelope': 'Building design and envelope measures that reduce energy demand.',
+  'E-waste recycling': 'Recovery of materials from discarded electrical and electronic equipment.',
+  'Electric vehicle battery (electrical storage)': 'Rechargeable batteries that store electricity to power electric vehicles.',
+  'Electrolysis': 'A process that uses electricity to drive a chemical reaction.',
+  'Energy networks and storage': 'Infrastructure that transports, manages and stores energy.',
+  'Fission': 'Splitting of heavy atomic nuclei to release energy.',
+  'Fossil fuels': 'Coal, oil and natural gas formed from ancient organic matter.',
+  'Geothermal': 'Energy obtained from heat within the Earth.',
+  'H2 infrastructure': 'Infrastructure for transporting, distributing and supplying hydrogen.',
+  'H2 storage': 'Technologies that store hydrogen for later use.',
+  'Heating, cooling and ventilation technologies': 'Technologies that control indoor temperature, ventilation and air quality.',
+  'High temperature': 'Industrial processes that require high-temperature heat.',
+  'Hydrogen': 'The energy field covering hydrogen production, infrastructure and use.',
+  'Hydrogen use in road transport': 'Use of hydrogen to power road vehicles.',
+  'Industrial heating': 'Supply of thermal energy for industrial production processes.',
+  'Industry': 'The sector that manufactures materials and finished products.',
+  'Iron and steel': 'Production and processing of iron and steel.',
+  'Liquid biofuels production': 'Production of liquid fuels from biomass or waste.',
+  'Low to medium temperature': 'Industrial processes requiring low- to medium-temperature heat.',
+  'Metallic products': 'Manufacture of products and components from metals.',
+  'Mineral processing and refining': 'Processing ores into purified minerals, metals or materials.',
+  'Nuclear': 'Energy produced through controlled nuclear reactions.',
+  'Oil and Gas': 'The sector covering exploration, production and processing of oil and gas.',
+  'Operations and equipment': 'Operations and equipment used in oil and gas facilities.',
+  'Physical grids': 'Physical infrastructure for electricity transmission and distribution.',
+  'Power generation': 'Electricity generation using hydrogen or hydrogen-based fuels.',
+  'Power generation from biomass': 'Electricity generation using biomass or organic waste.',
+  'Production': 'Processes that produce hydrogen from water, fuels or other resources.',
+  'Propulsion': 'Systems that generate power or thrust to propel a vessel.',
+  'Pulp and paper': 'Production of pulp, paper and related products.',
+  'Renewables': 'Energy from naturally replenished sources.',
+  'Road transport': 'Transport by road vehicles for passengers or freight.',
+  'Shipping': 'Transport of passengers or goods by sea or inland waterways.',
+  'Smart grids': 'Electricity networks using digital monitoring, communication and control.',
+  'Solar': 'Energy obtained from solar radiation.',
+  'Subsurface operations for geothermal energy': 'Underground activities for exploring, developing and managing geothermal resources.',
+  'Transport': 'The sector covering the movement of passengers and freight.',
+  'digital and tools': 'Digital technologies and analytical tools supporting energy systems.',
+  'large-scale or industrial': 'Technologies designed for large-capacity or industrial applications.',
+  'mass-manufactured': 'Technologies produced in high volumes as standardised units.',
+  'Thermal storage': 'Storage of energy as heat or cold for later use.',
+  'Thermal storage for buildings and district heating': 'Thermal energy storage serving buildings or district heating networks.',
+  'Building-level thermal storage': 'Thermal energy storage installed within a building.',
+  'Combustion and conversion': 'Processes that convert fuels into heat or other energy forms.',
+  'Components': 'Parts and subsystems used in aircraft.',
+  'EV charging equipment': 'Equipment that supplies electricity to electric vehicles.',
+  'Nuclear fuel cycles': 'Processes from nuclear fuel preparation to final waste management.',
+  'Other components': 'Components not included in another defined category.',
+  'Thermal processes': 'Industrial processes driven primarily by heat.',
+  'Fusion': 'Energy production by combining light atomic nuclei.',
+  'Sythetic fuels production': 'Production of fuels through chemical synthesis.',
 };
 
 // initiative.country in the cached dataset is only ever stored in English
@@ -514,6 +859,204 @@ const MODAL_CHROME_LABELS = {
   }
 };
 
+// Fixed prompt text for NotebookLM (or any chat-based tool) to turn a
+// pasted "NotebookLM article format" source into a 6-page, 16:9 technical
+// slide outline. Provided verbatim by the user — not generated or edited
+// by the app — and always copied as-is regardless of uiLang, since the
+// prompt itself hard-requires Traditional Chinese (Taiwan) output.
+const NOTEBOOKLM_PPT_PROMPT = `請只根據本筆記本已匯入的來源資料，製作一份6頁、16:9的技術分析簡報，供技術團隊及主管報告使用。
+
+【分析與製作原則】
+1. 全程使用台灣慣用繁體中文；技術英文名稱或縮寫可於第一次出現時放在括號內。
+2. 所有技術名稱、TRL、數字、年份、國家、案例、應用潛力及主要限制，只能使用本筆記本來源，不得自行補充或推測。
+3. 先通讀全部資料，提煉3至5項跨技術發現，不依資料順序逐項介紹。
+4. 準確區分研究、測試、示範、建置、運轉及商業化，不得提高案例的實際進展程度。
+5. 每頁只傳達一項主要訊息，正文原則上最多3項重點；第2頁可使用4個精簡摘要區塊。
+6. 投影片正文只呈現技術結論、數據、案例、潛力、限制與下一步，不放置分析方法、免責文字、資料限制或防錯說明。
+7. 六頁維持一致的專業配色與版面，優先使用矩陣、時間軸、案例卡片及簡潔圖示，避免3D圖表、裝飾性圖片、警語及長段文字。
+8. 矩陣須清楚標示座標軸、分類與技術位置；案例比較須使用一致的資訊結構。
+9. 生成前檢查數據、案例狀態、分類、繁體中文、圖表標示及版面，確認均與來源一致且清楚可讀。
+
+【六頁架構】
+第1頁｜封面
+- 依資料主題撰寫精簡且具分析性的標題。
+- 副標題說明技術範圍與分析目的。
+- 顯示資料集或平台名稱。
+- 不使用來源無法支持的預測或宣稱。
+
+第2頁｜技術現況一頁掌握
+本頁直接先給答案，不介紹分析方法。以4個精簡摘要區塊呈現：
+1. 技術總數與領域分布；
+2. TRL成熟度重點；
+3. 案例數量與主要進展；
+4. 應用潛力與主要限制關鍵字。
+頁面下方以一句話呈現最重要的整體結論，且該結論須能由第3至5頁的資料支持。
+
+第3頁｜技術成熟度分布矩陣
+- 標題直接呈現最重要的TRL分布結論。
+- 橫軸使用TRL 1至9。
+- 縱軸使用來源中的技術領域或應用類別。
+- 將全部技術放入矩陣，標示技術名稱及實際TRL。
+- 右側列出2至3項具體發現，每項只呈現結論、代表性技術及TRL。
+- 不加入案例細節或長段文字。
+
+第4頁｜關鍵案例：應用潛力與主要限制
+選擇3個資料完整且最具分析價值的案例。每個案例呈現：
+1. 技術名稱及TRL；
+2. 年份、國家及案例名稱；
+3. 實際進展或具體成果；
+4. 一項應用潛力；
+5. 一項主要限制。
+應用潛力與主要限制須從該技術的現況摘要、市場動態及案例內容歸納，不得自行評分或加入來源未提及的內容。
+來源未明確提及主要限制時，直接省略，不要顯示「資料未提供」等提醒。
+使用三欄案例比較或三張案例卡片呈現，每個案例使用相同結構並避免長段文字。
+
+第5頁｜商業化進展與後續重點
+- 綜合全部技術及案例，製作「TRL成熟度 × 案例實證階段」矩陣。
+- 橫軸：TRL成熟度。
+- 縱軸：研究、測試、示範、建置、運轉或商業化。
+- 只放入案例資訊足以判斷實證階段的代表性技術。
+- 每項技術只標示技術名稱、TRL及案例階段，不重複第4頁的潛力與限制。
+- 右側呈現2項整體發現及1項後續追蹤方向。
+- 若來源不足以建立案例實證階段矩陣，改用「TRL × 案例數」呈現，不得強行分類。
+
+第6頁｜感謝聆聽
+- 顯示「Q&A」及資料集或平台名稱。
+- 不自行增加網址、聯絡人或電子郵件。
+- 版面簡潔並保留充足留白。
+
+請直接生成最終6頁簡報，不必先提供大綱、分析過程或設計方案。`;
+
+// Step-by-step walkthrough shown in PptGuideModal, built from real product
+// screenshots (public/guide/guide-N.png) rather than icons, since the
+// previous icon-only version couldn't show *where* on NotebookLM's actual
+// UI to click. Each `arrows` entry is a normalized (0-100%) point on the
+// screenshot plus an approach direction ('nw' = arrow tail up-left of the
+// target, 'ne' = tail up-right — pick whichever keeps the tail from running
+// off the image edge) — see GuideArrow for how these render.
+//
+// Steps 5 and 6 are ordered prompt-copy-before-reopening-the-slide-panel
+// (not the order the screenshots were captured in) — copying the prompt
+// first means the user only has to re-enter NotebookLM once to both open
+// the slide-customization panel and immediately paste into it, instead of
+// opening the panel, leaving to fetch the prompt, then coming back.
+const PPT_GUIDE_CONTENT = {
+  zh: {
+    title: '簡報生成使用指南',
+    stepLabel: (i, n) => `步驟 ${i} / ${n}`,
+    prev: '上一步',
+    next: '下一步',
+    done: '關閉',
+    steps: [
+      {
+        image: './guide/guide-1.png',
+        title: '複製文章並前往 NotebookLM',
+        desc: '在平台的查詢策略總覽頁，點擊「複製 NotebookLM 文章格式」，再點擊「前往 NotebookLM」開啟新分頁。',
+        arrows: [{ x: 27.7, y: 71.6, dir: 'nw' }, { x: 66.8, y: 71.6, dir: 'nw' }],
+      },
+      {
+        image: './guide/guide-2.png',
+        title: '建立新的筆記本',
+        desc: '在 NotebookLM 首頁點擊「+」，建立一個新筆記本。',
+        arrows: [{ x: 62, y: 64, dir: 'nw' }],
+      },
+      {
+        image: './guide/guide-3.png',
+        title: '選擇「複製的文字」來源',
+        desc: '在新增來源畫面中，點擊「複製的文字」。',
+        arrows: [{ x: 80, y: 86, dir: 'nw' }],
+      },
+      {
+        image: './guide/guide-4.png',
+        title: '貼上文章並插入',
+        desc: '貼上剛才複製的文章內容，點擊「插入」。',
+        arrows: [{ x: 87, y: 92, dir: 'nw' }],
+      },
+      {
+        image: './guide/guide-5.png',
+        title: '回到平台，複製簡報生成 Prompt',
+        desc: '回到平台，點擊「複製簡報生成 Prompt」——先把這段文字準備好，等一下回到 NotebookLM 就能一次貼上。',
+        arrows: [{ x: 23.8, y: 84.7, dir: 'nw' }],
+      },
+      {
+        image: './guide/guide-6.png',
+        title: '開啟簡報功能',
+        desc: '回到 NotebookLM，在「工作室」面板點擊「簡報」右邊的「〉」。',
+        arrows: [{ x: 84, y: 32, dir: 'nw' }],
+      },
+      {
+        image: './guide/guide-7.png',
+        title: '選擇語言並貼上 Prompt',
+        desc: '將語言設定為希望簡報呈現的語言，在「說明要建立的簡報」欄位貼上剛複製的 Prompt，再點擊「生成」。',
+        arrows: [{ x: 15, y: 56, dir: 'ne' }, { x: 49, y: 76, dir: 'nw' }, { x: 90, y: 93, dir: 'nw' }],
+      },
+      {
+        image: null,
+        title: '等待簡報生成',
+        desc: 'NotebookLM 正在讀完你匯入的所有資料——好的簡報值得等一下，稍後回來查看成果吧。',
+        arrows: [],
+      },
+    ],
+  },
+  en: {
+    title: 'Slide Generation Guide',
+    stepLabel: (i, n) => `Step ${i} of ${n}`,
+    prev: 'Previous',
+    next: 'Next',
+    done: 'Close',
+    steps: [
+      {
+        image: './guide/guide-1.png',
+        title: 'Copy the article and open NotebookLM',
+        desc: 'On the platform\'s Strategy Overview tab, click "Copy NotebookLM article format", then click "Open NotebookLM" to open a new tab.',
+        arrows: [{ x: 27.7, y: 71.6, dir: 'nw' }, { x: 66.8, y: 71.6, dir: 'nw' }],
+      },
+      {
+        image: './guide/guide-2.png',
+        title: 'Create a new notebook',
+        desc: 'On the NotebookLM home page, click "+" to create a new notebook.',
+        arrows: [{ x: 62, y: 64, dir: 'nw' }],
+      },
+      {
+        image: './guide/guide-3.png',
+        title: 'Choose "Copied text" as the source',
+        desc: 'On the add-source screen, click "Copied text".',
+        arrows: [{ x: 80, y: 86, dir: 'nw' }],
+      },
+      {
+        image: './guide/guide-4.png',
+        title: 'Paste the article and insert it',
+        desc: 'Paste what you copied, then click "Insert".',
+        arrows: [{ x: 87, y: 92, dir: 'nw' }],
+      },
+      {
+        image: './guide/guide-5.png',
+        title: 'Back on the platform, copy the prompt',
+        desc: 'Back on the platform, click "Copy slide-generation prompt" — getting it ready now means you only need one more trip back into NotebookLM.',
+        arrows: [{ x: 23.8, y: 84.7, dir: 'nw' }],
+      },
+      {
+        image: './guide/guide-6.png',
+        title: 'Open the slide deck feature',
+        desc: 'Back in NotebookLM, in the "Studio" panel, click the ">" next to "Slide deck".',
+        arrows: [{ x: 84, y: 32, dir: 'nw' }],
+      },
+      {
+        image: './guide/guide-7.png',
+        title: 'Choose a language and paste the prompt',
+        desc: 'Set the language, paste the prompt you copied into "Describe the slide deck that you want to create", then click "Generate".',
+        arrows: [{ x: 15, y: 56, dir: 'ne' }, { x: 49, y: 76, dir: 'nw' }, { x: 90, y: 93, dir: 'nw' }],
+      },
+      {
+        image: null,
+        title: 'Wait for the slides to generate',
+        desc: "NotebookLM is working through everything you gave it — a good deck is worth the wait. Check back in a bit.",
+        arrows: [],
+      },
+    ],
+  },
+};
+
 // Platform-wide UI chrome (header, search panel, tabs, footer). Same zh/en
 // toggle idea as MODAL_CHROME_LABELS above, driven by the same global uiLang
 // state — this is the app's own interface, not the underlying dataset.
@@ -551,7 +1094,12 @@ const APP_LABELS = {
     copyArticle: '複製 NotebookLM 文章格式',
     copied: '已複製！',
     openNotebookLM: '前往 NotebookLM',
-    copyArticleReminder: '複製後請記得手動貼到 NotebookLM 的「新增來源」中。',
+    copyPptPrompt: '複製簡報生成 Prompt',
+    openPptGuide: '使用指南',
+    pptCardTitle: '用 NotebookLM 製作簡報',
+    pptCardDescPrefix: '透過 NotebookLM 的 AI 功能，把這次查詢結果的',
+    pptCardDescCheckedPrefix: '透過 NotebookLM 的 AI 功能，把你勾選的',
+    pptCardDescSuffix: '筆技術轉換成一份簡報！',
     exportStrategyTitle: '匯出完整查詢結果',
     exportStrategyDescPrefix: '將目前符合條件的全部',
     exportStrategyDescSuffix: '筆技術資料匯出為 CSV 檔案。',
@@ -568,7 +1116,11 @@ const APP_LABELS = {
     selectPrompt: '請從左側列表選取一項技術以檢視詳情',
     fieldSector: (s) => `領域: ${s}`,
     fieldTrl: (v) => `TRL: ${v}`,
+    fieldAdoptionStage: (s) => `採用階段: ${s}`,
     fieldCaseCount: (n) => `相關案例: ${n} 筆`,
+    pathBreadcrumbLabel: '分類路徑（點擊可篩選同路徑的技術）',
+    pathFilterActive: '路徑篩選中',
+    clearPathFilter: '清除路徑篩選',
     summaryTitle: '中文摘要',
     marketTitle: '市場與示範動態',
     aiDisclaimer: '提醒：中文摘要由 AI 輔助生成，正式引用前請核對原始 IEA 資料。',
@@ -635,7 +1187,12 @@ const APP_LABELS = {
     copyArticle: 'Copy NotebookLM article format',
     copied: 'Copied!',
     openNotebookLM: 'Open NotebookLM',
-    copyArticleReminder: 'After copying, remember to paste it into NotebookLM under "Add source".',
+    copyPptPrompt: 'Copy slide-generation prompt',
+    openPptGuide: 'How to use',
+    pptCardTitle: 'Build Slides with NotebookLM',
+    pptCardDescPrefix: "Using NotebookLM's AI, turn the",
+    pptCardDescCheckedPrefix: "Using NotebookLM's AI, turn your checked",
+    pptCardDescSuffix: 'matching technologies into a slide deck!',
     exportStrategyTitle: 'Export Full Query Results',
     exportStrategyDescPrefix: 'Export all',
     exportStrategyDescSuffix: 'matching technologies as a CSV file.',
@@ -652,7 +1209,11 @@ const APP_LABELS = {
     selectPrompt: 'Select a technology from the list on the left to see its details',
     fieldSector: (s) => `Sector: ${s}`,
     fieldTrl: (v) => `TRL: ${v}`,
+    fieldAdoptionStage: (s) => `Adoption stage: ${s}`,
     fieldCaseCount: (n) => `Related cases: ${n}`,
+    pathBreadcrumbLabel: 'Classification path (click a segment to filter matching technologies)',
+    pathFilterActive: 'Path filter active',
+    clearPathFilter: 'Clear path filter',
     summaryTitle: 'Summary',
     marketTitle: 'Market & Deployment Dynamics',
     aiDisclaimer: 'Note: this summary was AI-assisted and cached from the source data; verify against the original IEA data before formal citation.',
@@ -729,8 +1290,9 @@ function safeLinkUrl(url) {
   return /^https?:\/\//i.test(url.trim()) ? url.trim() : null;
 }
 
-// Curated to exactly the fields the briefing report prompt actually reads
-// or cites — not every field on the object. Checked against the real
+// Shared by both the user-facing CSV export and the AI briefing-report
+// prompt (see buildBriefingReportPrompt) — curated to exactly the fields
+// worth a column, not every field on the object. Checked against the real
 // dataset before trimming: "theme"/"keyCountries"/the technology-level
 // "read_more" are empty on every one of the 639 cached technologies;
 // "description"/"NZErationale" are byte-for-byte duplicates of
@@ -739,18 +1301,20 @@ function safeLinkUrl(url) {
 // synthesizes from the _zh columns, regardless of output language); the
 // "sector" breadcrumb array duplicates sector_zh/sector_en; and the
 // trl_2020..trl_2025 per-year fields only feed the in-app trend chart, not
-// this report (which only cites latest_trl). Dropping all of those cuts the
-// prompt from ~25 columns to 10, with the biggest token savings coming from
-// removing four duplicate long-text summary columns. Still includes "_id"
-// as the first column (unlike the user-facing CSV export, which omits it)
-// since that's what lets report content stay traceable back to real
-// technology records, and the full "initiatives" array (serialized as JSON
-// per cell) so the report can cite real project names/figures instead of
-// inventing plausible-sounding ones.
+// this report (which only cites latest_trl). "adoption_stage" (Awaiting
+// adoption / Building momentum / Commercial in many markets) exists in the
+// original raw IEA source but was dropped somewhere in this dataset's
+// rebuild — restored here since it's a genuinely different axis from TRL
+// (market/commercial diffusion, not technical maturity), populated on 227
+// of the 639 technologies, empty string on the rest. Includes "_id" as the
+// first column so report content stays traceable back to real technology
+// records, and the full "initiatives" array (serialized as JSON per cell)
+// so the report can cite real project names/figures instead of inventing
+// plausible-sounding ones.
 function buildFullDataCsv(techs) {
   const allKeys = [
     '_id', 'technology_name', 'technology_name_zh', 'sector_zh', 'sector_en',
-    'latest_trl', 'technology_status_summary_zh', 'market_dynamics_summary_zh',
+    'latest_trl', 'adoption_stage', 'technology_status_summary_zh', 'market_dynamics_summary_zh',
     'linked_records_count', 'initiatives'
   ];
   let csvContent = allKeys.map(key => escapeCsv(key)).join(",") + "\n";
@@ -917,7 +1481,7 @@ function buildBriefingReportPrompt(csvStr, uiLang = 'zh') {
     ? '整個平台目前設定為英文介面。請直接用英文輸出所有內容：report 底下每一個欄位（title、executive_summary、overview_table、tech_sections、trends_section 裡的所有文字），以及所有 "name" 顯示用技術名稱，全部都要是英文，不要輸出中文，也不需要使用者另外追問才翻譯。CSV 裡的 "_id" 仍必須照抄原始字串，不受語言影響。'
     : '請用繁體中文輸出所有內容。';
 
-  return `你是內建於「淨零碳排技術查詢平台」的策略分析引擎。以下 CSV 是本次查詢結果的技術清單，每一列除了名稱、產業別、TRL、兩段摘要文字之外，"initiatives" 欄位是這項技術連結的完整案例清單（JSON 陣列，每筆案例可能包含年份、國家、類型、描述、來源連結），其餘欄位是原始資料庫裡的其他欄位。
+  return `你是內建於「淨零碳排技術查詢平台」的策略分析引擎。以下 CSV 是本次查詢結果的技術清單，每一列除了名稱、產業別、TRL、兩段摘要文字之外，"adoption_stage" 欄位是這項技術的市場採用階段（Awaiting adoption／Building momentum／Commercial in many markets 三種之一，空字串代表 IEA 未評級，不代表資料缺漏），這是跟 TRL（技術本身成熟度）不同的獨立維度，代表市場／商業化普及程度，若某項技術有這個欄位、請在分析中明確運用它（尤其是市場進展、商業化挑戰相關的段落），"initiatives" 欄位是這項技術連結的完整案例清單（JSON 陣列，每筆案例可能包含年份、國家、類型、描述、來源連結），其餘欄位是原始資料庫裡的其他欄位。
 
 前四頁統計摘要（查詢總覽、技術成熟度分佈、專案活動熱區、關鍵技術清單）已經由本地程式正確算好，不需要你重做，也不在你的輸出範圍內。你的任務是撰寫一份完整、詳盡的「簡要報告」（briefing document），結構如下：
 
@@ -1647,6 +2211,148 @@ const KPI_CARD_STYLES = [
   { color: '#7C3AED', Icon: Globe },
 ];
 
+// ─── PPT Generation Guide Modal ───────────────────────────────────────────────
+
+// A red pointer arrow drawn at a normalized (x%, y%) point over a
+// screenshot, its tip landing exactly on that point regardless of the
+// image's rendered size. `dir` picks which corner of the arrow's own
+// bounding box is pinned to (x,y) — 'nw' anchors the box's bottom-right
+// corner there (tail extends up-left), 'ne' anchors the bottom-left corner
+// there (tail extends up-right) — pick whichever keeps the tail from
+// running past the image edge for a given target.
+//
+// Deliberately short (an 18-unit stroke, not a full-box diagonal) and has
+// no circle/ring marker at the tip — both were covering nearby button
+// labels on the denser screenshots. The tip's position in the 52x52
+// viewBox (42,42 for 'nw'; 10,42 for 'ne') is unchanged from a longer
+// earlier version, only the tail moved closer to it, so the translate
+// percentages that pin the tip to (x%, y%) — 80.8%/19.2% of the box's own
+// size — still apply; don't recompute those if you resize the box itself.
+//
+// GUIDE_ARROW_COLOR (#FBEC31) is sampled directly from den-mascot.png's
+// fur so the arrow reads as "part of DEN's palette" rather than a generic
+// UI red. A pure bright yellow has weak contrast on the mostly-white
+// screenshots though, so each stroke is drawn twice — a wider dark-slate
+// pass underneath for a thin outline, then the gold pass on top — instead
+// of just picking a darker gold that would drift away from the sampled hue.
+const GUIDE_ARROW_COLOR = '#FBEC31';
+const GUIDE_ARROW_OUTLINE = '#1E293B';
+function GuideArrow({ x, y, dir = 'nw' }) {
+  const isNe = dir === 'ne';
+  const xShift = isNe ? -19.2 : -80.8;
+  const geometry = isNe
+    ? { line: { x1: 28, y1: 24, x2: 10, y2: 42 }, head: 'M10,42 L20,39 M10,42 L13,32' }
+    : { line: { x1: 24, y1: 24, x2: 42, y2: 42 }, head: 'M42,42 L32,39 M42,42 L39,32' };
+  return (
+    <div
+      className="absolute pointer-events-none"
+      style={{ left: `${x}%`, top: `${y}%`, transform: `translate(${xShift}%, -80.8%)` }}
+    >
+      <svg width="52" height="52" viewBox="0 0 52 52" style={{ overflow: 'visible', display: 'block' }}>
+        <g stroke={GUIDE_ARROW_OUTLINE} strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
+          <line {...geometry.line} />
+          <path d={geometry.head} />
+        </g>
+        <g stroke={GUIDE_ARROW_COLOR} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none">
+          <line {...geometry.line} />
+          <path d={geometry.head} />
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+// Paginated walkthrough for the copy-article → NotebookLM source →
+// copy-prompt → generate flow, built from real screenshots (see
+// PPT_GUIDE_CONTENT) with arrows pointing at exactly what to click. The
+// final step has no screenshot (nothing to point at while waiting).
+function PptGuideModal({ isOpen, onClose, uiLang }) {
+  const [step, setStep] = useState(0);
+  if (!isOpen) return null;
+
+  const t = PPT_GUIDE_CONTENT[uiLang];
+  const steps = t.steps;
+  const total = steps.length;
+  const current = steps[step];
+
+  const handleClose = () => {
+    setStep(0);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={handleClose}>
+      <div className="relative w-full max-w-xl" onClick={e => e.stopPropagation()}>
+        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50">
+            <h3 className="text-base font-bold text-slate-800">{t.title}</h3>
+            <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="p-6 flex flex-col items-center text-center gap-3">
+            {/* DEN rides along next to the step label/title on every
+                screenshot step. The final (no-image) step already shows
+                DEN front-and-center as the working animation below, so it
+                doesn't get a second copy up here too. */}
+            <div className="flex items-center justify-center gap-3">
+              {current.image && (
+                <img src="./guide/den-mascot.png" alt="DEN" className="w-11 h-11 object-contain flex-shrink-0" />
+              )}
+              <div className="text-left">
+                <div className="text-xs font-semibold tracking-wide text-purple-600">{t.stepLabel(step + 1, total)}</div>
+                <h4 className="text-lg font-bold text-slate-800">{current.title}</h4>
+              </div>
+            </div>
+            <p className="text-base text-slate-600 leading-relaxed max-w-lg">{current.desc}</p>
+
+            {current.image ? (
+              <div className="relative inline-block mt-1 rounded-xl overflow-hidden border border-slate-200 shadow-sm max-h-80">
+                <img src={current.image} alt={current.title} className="block max-h-80 w-auto" />
+                {current.arrows.map((a, i) => (
+                  <GuideArrow key={i} x={a.x} y={a.y} dir={a.dir} />
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-8">
+                <img src="./guide/den-mascot.png" alt="DEN" className="w-24 h-24 object-contain animate-den-work" />
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between px-5 py-4 border-t border-slate-100">
+            <button
+              onClick={() => setStep(s => Math.max(0, s - 1))}
+              disabled={step === 0}
+              className="flex items-center gap-1 text-sm font-medium text-slate-500 disabled:opacity-30 disabled:cursor-not-allowed hover:text-slate-700 transition-colors"
+            >
+              <ChevronLeft size={16} /> {t.prev}
+            </button>
+            <div className="flex gap-1.5">
+              {steps.map((_, i) => (
+                <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === step ? 'bg-blue-600' : 'bg-slate-200'}`} />
+              ))}
+            </div>
+            {step === total - 1 ? (
+              <button onClick={handleClose} className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                {t.done}
+              </button>
+            ) : (
+              <button
+                onClick={() => setStep(s => Math.min(total - 1, s + 1))}
+                className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                {t.next} <ChevronRight size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Slide Preview Component (White/Light style) ─────────────────────────────
 
 function SlidePreview({ slide, index, totalSlides, accentColor, techById, onJumpToTech, uiLabels, uiLang }) {
@@ -2180,6 +2886,16 @@ export default function App() {
   const [searchMode, setSearchMode] = useState('subject');
   const [selectedTech, setSelectedTech] = useState(null);
   const [selectedSector, setSelectedSector] = useState('');
+  // Set when the user clicks a segment of a technology's full sector-path
+  // breadcrumb (in the detail view) — an array of the *English* sector[]
+  // values up to and including the clicked segment, e.g. ['large-scale or
+  // industrial', 'Industry', 'Aluminium']. Kept separate from selectedSector
+  // (which does a loose substring match against a flattened bag of sector
+  // text) because a path click needs an exact, ordered prefix match against
+  // tech.sector — clicking "Aluminium" must not also pull in an unrelated
+  // "Aluminium" appearing at a different depth under a different top
+  // category. See searchData below for the matching logic.
+  const [pathFilter, setPathFilter] = useState(null);
   // Lifted out of Dashboard so handleJumpToTech (below) can switch back to
   // the "技術詳情" tab when a slide reference is clicked from inside the AI
   // modal — otherwise selectedTech updates invisibly behind whichever tab
@@ -2657,6 +3373,8 @@ export default function App() {
         setSelectedTech={setSelectedTech}
         selectedSector={selectedSector}
         setSelectedSector={setSelectedSector}
+        pathFilter={pathFilter}
+        setPathFilter={setPathFilter}
         onOpenStrategyOverview={handleOpenStrategyOverview}
         apiKey={apiKey}
         onApiKeyChange={handleApiKeyChange}
@@ -2889,6 +3607,7 @@ function Dashboard({
   query, setQuery, searchMode, setSearchMode,
   selectedTech, setSelectedTech,
   selectedSector, setSelectedSector,
+  pathFilter, setPathFilter,
   onOpenStrategyOverview,
   apiKey, onApiKeyChange,
   aiProvider, onProviderChange,
@@ -2905,6 +3624,7 @@ function Dashboard({
   const [showApiKey, setShowApiKey] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedArticleKey, setCopiedArticleKey] = useState(null);
+  const [showPptGuide, setShowPptGuide] = useState(false);
   // Search header collapse — folds the mode toggle / sector dropdown /
   // search input away so the technology list below gets the vertical space.
   const [searchPanelCollapsed, setSearchPanelCollapsed] = useState(false);
@@ -2927,6 +3647,37 @@ function Dashboard({
   const initiativeCount = dataset.source_stats?.initiative_rows ??
     rows.reduce((sum, tech) => sum + (Array.isArray(tech.initiatives) ? tech.initiatives.length : 0), 0);
 
+  // Global sector_en -> sector_zh leaf lookup, for translating a pathFilter
+  // segment when displaying the active-filter chip trail — pathFilter is
+  // just an array of English strings (no longer tied to the tech it was
+  // clicked from), and its last segment may be a leaf or an intermediate
+  // category depending on which breadcrumb chip the user clicked.
+  const sectorLeafZhMap = useMemo(() => {
+    const m = {};
+    rows.forEach(t => { if (t.sector_en && t.sector_zh) m[t.sector_en] = t.sector_zh; });
+    return m;
+  }, [rows]);
+  const pathSegmentZh = (seg) => sectorLeafZhMap[seg] || SECTOR_TRANSLATIONS[seg] || seg;
+
+  // Category label used by the Strategy tab's sector-distribution donut
+  // (and the locked-segment stats/definition below it). Once pathFilter
+  // narrows the result set past the top level, every remaining technology
+  // already shares that same prefix — grouping by each tech's own final
+  // leaf would still work, but grouping by the *next* segment past the
+  // clicked prefix is what actually reveals a breakdown within the current
+  // filter instead of a single 100%-share slice repeating the filter
+  // itself. Falls back to the true leaf (sector_zh/sector_en, unchanged
+  // from before pathFilter existed) whenever pathFilter is inactive, only
+  // one level deep (nothing meaningful to unify past yet), or a given tech
+  // simply has no path left beyond the clicked prefix.
+  const dynamicCategoryFor = (tech) => {
+    if (pathFilter && pathFilter.length > 1 && Array.isArray(tech.sector) && tech.sector.length > pathFilter.length) {
+      const segEn = tech.sector[pathFilter.length];
+      if (segEn !== undefined) return { en: segEn, zh: pathSegmentZh(segEn) };
+    }
+    return { en: tech.sector_en || 'Unlabeled', zh: tech.sector_zh || '未標示' };
+  };
+
   const datasetVersion = (dataset.dataset_version || "IEA ETP Clean Energy Tech").replace(/ 2026/g, '');
 
   // Header's "dataset generated at" box — real data (dataset.generated_at
@@ -2941,7 +3692,7 @@ function Dashboard({
   })();
 
   const searchData = useMemo(() => {
-    if (!query.trim() && !selectedSector) return { results: [], totalMatches: 0 };
+    if (!query.trim() && !selectedSector && !pathFilter) return { results: [], totalMatches: 0 };
     const lowerQuery = query.trim().toLowerCase();
     const lowerSector = selectedSector.trim().toLowerCase();
 
@@ -2954,7 +3705,18 @@ function Dashboard({
       const subjectTexts = [tech.technology_name, tech.technology_name_zh].filter(Boolean).map(s => String(s).toLowerCase());
       const descTexts = [tech.description, tech.description_en, tech.description_zh, tech.technology_status_summary_zh, tech.market_dynamics_summary_zh, tech.NZErationale, tech.NZErationale_zh, tech.nze_rationale, tech.supplyChain, tech.supply_chain, tech.theme].filter(Boolean).map(s => String(s).toLowerCase());
 
-      let passesSectorFilter = true, passesQueryFilter = true;
+      let passesSectorFilter = true, passesQueryFilter = true, passesPathFilter = true;
+
+      // pathFilter (set by clicking a breadcrumb segment in the detail view)
+      // is an ordered, exact prefix of tech.sector — deliberately NOT a loose
+      // substring match like selectedSector, so clicking "Aluminium" only
+      // pulls in technologies actually nested under that same path, not any
+      // technology whose sector text happens to contain "Aluminium".
+      if (pathFilter && pathFilter.length > 0) {
+        const isPathMatch = Array.isArray(tech.sector) && pathFilter.every((seg, i) => tech.sector[i] === seg);
+        if (!isPathMatch) passesPathFilter = false;
+        else { score += 1; isDirectHit = true; }
+      }
 
       if (searchMode === 'subject') {
         if (selectedSector) { if (!isSectorMatch) passesSectorFilter = false; else { score += 1; isDirectHit = true; } }
@@ -2984,7 +3746,7 @@ function Dashboard({
         }
       }
 
-      if (passesSectorFilter && passesQueryFilter && score > 0) return { tech, score, isDirectHit, isDescHit };
+      if (passesSectorFilter && passesQueryFilter && passesPathFilter && score > 0) return { tech, score, isDirectHit, isDescHit };
       return null;
     }).filter(Boolean);
 
@@ -2995,7 +3757,7 @@ function Dashboard({
     });
 
     return { results, totalMatches: results.length };
-  }, [query, rows, searchMode, selectedSector]);
+  }, [query, rows, searchMode, selectedSector, pathFilter]);
 
   const totalMatches = searchData.totalMatches;
   const totalPages = Math.max(1, Math.ceil(totalMatches / 20));
@@ -3023,7 +3785,8 @@ function Dashboard({
   const sectorDonutData = useMemo(() => {
     const counts = {};
     strategyResults.forEach(r => {
-      const s = (uiLang === 'en' ? r.tech.sector_en : r.tech.sector_zh) || (uiLang === 'en' ? 'Unlabeled' : '未標示');
+      const cat = dynamicCategoryFor(r.tech);
+      const s = (uiLang === 'en' ? cat.en : cat.zh) || (uiLang === 'en' ? 'Unlabeled' : '未標示');
       counts[s] = (counts[s] || 0) + 1;
     });
     const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
@@ -3036,11 +3799,15 @@ function Dashboard({
     const restCount = sorted.slice(5).reduce((sum, [, c]) => sum + c, 0);
     if (restCount > 0) top.push({ label: uiLang === 'en' ? 'Other' : '其他', value: restCount, color: '#94A3B8' });
     return top;
-  }, [strategyResults, uiLang]);
+  }, [strategyResults, uiLang, pathFilter]);
 
-  // Locked-segment summary sentence — rule-based, not AI-generated. Only
-  // the zh definitions in SECTOR_DEFINITIONS were hand-reviewed, so English
-  // mode skips that clause rather than guessing a translation.
+  // Locked-segment summary sentence — rule-based, not AI-generated. Shows a
+  // one-line definition clause when one exists for the current uiLang.
+  // sectorName may now be a true leaf (SECTOR_DEFINITIONS/_EN, keyed by
+  // zh/en respectively) or a dynamic-depth intermediate category from
+  // dynamicCategoryFor above (SECTOR_PATH_DEFINITIONS_ZH/_EN, both keyed by
+  // the English form) — sectorLeafZhMap membership tells them apart, since
+  // it only ever contains genuine sector_en leaves.
   const [lockedSector, setLockedSector] = useState(null);
 
   const lockedSectorStats = useMemo(() => {
@@ -3048,7 +3815,10 @@ function Dashboard({
     const sectorName = lockedSector.label;
     const techsInSector = strategyResults
       .map(r => r.tech)
-      .filter(t => ((uiLang === 'en' ? t.sector_en : t.sector_zh) || (uiLang === 'en' ? 'Unlabeled' : '未標示')) === sectorName);
+      .filter(t => {
+        const cat = dynamicCategoryFor(t);
+        return (uiLang === 'en' ? cat.en : cat.zh) === sectorName;
+      });
     if (techsInSector.length === 0) return null;
 
     const trlCounts = [0, 0, 0, 0];
@@ -3074,21 +3844,28 @@ function Dashboard({
     });
     const topCountryEntry = Object.entries(countryCounts).sort((a, b) => b[1] - a[1])[0];
 
+    const sectorNameEn = dynamicCategoryFor(techsInSector[0]).en;
+    const isLeaf = !!sectorLeafZhMap[sectorNameEn];
+    const definition = (uiLang === 'en'
+      ? (isLeaf ? SECTOR_DEFINITIONS_EN[sectorNameEn] : SECTOR_PATH_DEFINITIONS_EN[sectorNameEn])
+      : (isLeaf ? SECTOR_DEFINITIONS[sectorName] : SECTOR_PATH_DEFINITIONS_ZH[sectorNameEn])) || null;
+
     return {
       count: techsInSector.length,
       topStage: TRL_COMPACT_LABELS_ZH[topBucket],
       caseCount,
       topCountry: topCountryEntry ? topCountryEntry[0] : null,
-      definition: SECTOR_DEFINITIONS[sectorName] || null
+      definition
     };
-  }, [lockedSector, strategyResults, uiLang]);
+  }, [lockedSector, strategyResults, uiLang, pathFilter]);
 
   const lockedSectorSummary = useMemo(() => {
     if (!lockedSector || !lockedSectorStats) return null;
     const { count, topStage, caseCount, topCountry, definition } = lockedSectorStats;
     if (uiLang === 'en') {
+      const defClauseEn = definition ? ` (${definition})` : '';
       const countryClause = topCountry ? `, most active in ${topCountry}` : '';
-      return `"${lockedSector.label}" currently has ${count} technologies, mostly at ${topStage}; ${caseCount} related cases in total${countryClause}.`;
+      return `"${lockedSector.label}"${defClauseEn} currently has ${count} technologies, mostly at ${topStage}; ${caseCount} related cases in total${countryClause}.`;
     }
     const defClause = definition ? `（${definition}）` : '';
     const countryClause = topCountry ? `，以${topCountry}最為活躍` : '';
@@ -3179,6 +3956,21 @@ function Dashboard({
   const handleCopyListArticle = () => {
     const exportTechs = strategyResults.map(r => r.tech);
     handleCopyTechsArticle(exportTechs, 'list');
+  };
+
+  // NOTEBOOKLM_PPT_PROMPT is fixed text (not per-technology), so this just
+  // copies it as-is — same clipboard/feedback mechanism as the article copy
+  // above, keyed separately so the two buttons' "copied!" states don't
+  // collide.
+  const handleCopyPptPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(NOTEBOOKLM_PPT_PROMPT);
+      setCopiedArticleKey('pptPrompt');
+      window.clearTimeout(copyResetTimerRef.current);
+      copyResetTimerRef.current = window.setTimeout(() => setCopiedArticleKey(null), 2000);
+    } catch (err) {
+      console.error('Clipboard copy failed', err);
+    }
   };
 
   return (
@@ -3343,7 +4135,7 @@ function Dashboard({
                 </div>
 
                 <div className="relative mb-2 2xl:mb-3">
-                  <select value={selectedSector} onChange={e => setSelectedSector(e.target.value)} className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base appearance-none bg-white font-medium text-slate-700">
+                  <select value={selectedSector} onChange={e => { setSelectedSector(e.target.value); setPathFilter(null); }} className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base appearance-none bg-white font-medium text-slate-700">
                     <option value="">{L.allSectors}</option>
                     {Object.entries(FIXED_SECTORS).map(([sector, subsectors]) => (
                       <optgroup key={sector} label={`${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}>
@@ -3362,6 +4154,16 @@ function Dashboard({
                   <input type="text" placeholder={L.searchPlaceholder} className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base transition-shadow" value={query} onChange={e => setQuery(e.target.value)} />
                 </div>
                 <div className="text-xs text-slate-500 mt-2 leading-relaxed">{L.searchHint}</div>
+                {pathFilter && pathFilter.length > 0 && (
+                  <div className="flex items-center justify-between gap-2 bg-blue-50 border border-blue-100 rounded px-2 py-1.5 mt-2">
+                    <span className="text-xs text-blue-700 font-medium truncate">
+                      {L.pathFilterActive}: {pathFilter.map(seg => uiLang === 'en' ? seg : pathSegmentZh(seg)).join(' > ')}
+                    </span>
+                    <button onClick={() => setPathFilter(null)} className="text-xs font-medium text-blue-600 hover:text-blue-800 underline flex-shrink-0">
+                      {L.clearPathFilter}
+                    </button>
+                  </div>
+                )}
               </>
             )}
 
@@ -3396,7 +4198,7 @@ function Dashboard({
           </div>
 
           <div ref={listContainerRef} className="flex-1 overflow-y-auto p-2 bg-white">
-            {!query.trim() && !selectedSector ? (
+            {!query.trim() && !selectedSector && !pathFilter ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 p-6 text-center">
                 <Search size={32} className="mb-2 opacity-50" />
                 <p>{L.emptyPrompt}</p>
@@ -3491,8 +4293,33 @@ function Dashboard({
                       <div className="flex flex-wrap gap-2 text-sm font-medium">
                         <span className="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 rounded">{L.fieldSector((uiLang === 'en' ? selectedTech.sector_en : null) || selectedTech.sector_zh || L.unlabeled)}</span>
                         <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2 py-1 rounded">{L.fieldTrl(selectedTech.latest_trl || L.unlabeled)}</span>
+                        {selectedTech.adoption_stage && (
+                          <span className="bg-purple-50 text-purple-700 border border-purple-100 px-2 py-1 rounded">{L.fieldAdoptionStage(adoptionStageLabel(selectedTech.adoption_stage, uiLang))}</span>
+                        )}
                         <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded">{L.fieldCaseCount(selectedTech.linked_records_count || 0)}</span>
                       </div>
+                      {Array.isArray(selectedTech.sector) && selectedTech.sector.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <div className="text-xs text-slate-400 mb-1.5">{L.pathBreadcrumbLabel}</div>
+                          <div className="flex flex-wrap items-center gap-1 text-sm">
+                            {selectedTech.sector.map((seg, i) => (
+                              <React.Fragment key={i}>
+                                {i > 0 && <ChevronRight size={14} className="text-slate-300 flex-shrink-0" />}
+                                <button
+                                  onClick={() => {
+                                    setPathFilter(selectedTech.sector.slice(0, i + 1));
+                                    setSelectedSector('');
+                                    setQuery('');
+                                  }}
+                                  className="text-blue-600 hover:text-blue-800 hover:underline font-medium px-1 py-0.5 rounded transition-colors"
+                                >
+                                  {uiLang === 'en' ? seg : sectorSegmentLabel(selectedTech, i)}
+                                </button>
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Summary */}
@@ -3630,7 +4457,12 @@ function Dashboard({
                         </button>
                       </div>
 
-                      {/* Export card */}
+                      {/* Export card — CSV download only; the NotebookLM/PPT
+                          workflow used to be crammed into this same card
+                          (5 buttons, 2 divider rows) but the two features
+                          serve different intents (raw data vs. an external
+                          slide-generation workflow), so they're now split
+                          into separate cards. */}
                       <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-emerald-500">
                         <div className="flex items-start gap-4 mb-5">
                           <div className="bg-emerald-50 text-emerald-600 rounded-xl p-3 flex-shrink-0">
@@ -3643,34 +4475,68 @@ function Dashboard({
                             </p>
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-3">
-                          <button
-                            onClick={handleExportListCsv}
-                            disabled={strategyCount === 0}
-                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
-                          >
-                            <Download size={18} /> {L.exportAll}
-                          </button>
+                        <button
+                          onClick={handleExportListCsv}
+                          disabled={strategyCount === 0}
+                          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
+                        >
+                          <Download size={18} /> {L.exportAll}
+                        </button>
+                      </div>
+
+                      {/* NotebookLM / slide-generation card — the step-by-step
+                          "how do I actually use this" detail lives in
+                          PptGuideModal now (with real screenshots and
+                          arrows), so this card doesn't need to spell out the
+                          paste-here/paste-there sequence in its own text
+                          anymore; the guide button is the primary action,
+                          and the three raw actions it walks through sit
+                          below as lightweight secondary buttons for anyone
+                          who already knows the flow. */}
+                      <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-blue-500">
+                        <div className="flex items-start gap-4 mb-5">
+                          <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-xl p-3 flex-shrink-0">
+                            <Presentation size={22} />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-slate-800">{L.pptCardTitle}</h3>
+                            <p className="text-base text-slate-500 mt-1 leading-relaxed">
+                              {isCheckedSubsetActive ? L.pptCardDescCheckedPrefix : L.pptCardDescPrefix} <span className="font-semibold text-slate-700">{strategyCount}</span> {L.pptCardDescSuffix}
+                            </p>
+                          </div>
                         </div>
 
-                        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-3 items-center">
+                        <button
+                          onClick={() => setShowPptGuide(true)}
+                          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-all"
+                        >
+                          <HelpCircle size={18} /> {L.openPptGuide}
+                        </button>
+
+                        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-2">
                           <button
                             onClick={handleCopyListArticle}
                             disabled={strategyCount === 0}
-                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:cursor-not-allowed text-slate-700 border border-slate-300 shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
+                            className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-800 disabled:text-slate-300 disabled:cursor-not-allowed bg-slate-50 hover:bg-slate-100 disabled:hover:bg-slate-50 rounded-lg px-4 py-2 transition-colors"
                           >
-                            <Copy size={18} /> {copiedArticleKey === 'list' ? L.copied : L.copyArticle}
+                            <Copy size={15} /> {copiedArticleKey === 'list' ? L.copied : L.copyArticle}
                           </button>
                           <a
                             href="https://notebooklm.google.com"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
+                            className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 rounded-lg px-4 py-2 transition-colors"
                           >
-                            <ExternalLink size={18} /> {L.openNotebookLM}
+                            <ExternalLink size={15} /> {L.openNotebookLM}
                           </a>
+                          <button
+                            onClick={handleCopyPptPrompt}
+                            disabled={strategyCount === 0}
+                            className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-800 disabled:text-slate-300 disabled:cursor-not-allowed bg-slate-50 hover:bg-slate-100 disabled:hover:bg-slate-50 rounded-lg px-4 py-2 transition-colors"
+                          >
+                            <Copy size={15} /> {copiedArticleKey === 'pptPrompt' ? L.copied : L.copyPptPrompt}
+                          </button>
                         </div>
-                        <p className="text-sm text-slate-400 mt-3 leading-relaxed">{L.copyArticleReminder}</p>
                       </div>
                     </div>
                   </div>
@@ -3685,6 +4551,7 @@ function Dashboard({
         </section>
       </main>
       )}
+      <PptGuideModal isOpen={showPptGuide} onClose={() => setShowPptGuide(false)} uiLang={uiLang} />
     </div>
   );
 }
