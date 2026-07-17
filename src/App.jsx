@@ -74,6 +74,43 @@ const FIXED_SECTORS = {
   "Critical minerals": ["Mineral processing and refining", "Mining and extraction", "E-waste recycling"]
 };
 
+// Curated ITRI 綠能所 sub-group -> IEA technology mapping, hand-built from
+// IEA對應技術清單_對照報告.md (the C/D/H/J/N/P/R/U group comparison audit).
+// Only sub-groups with at least one confirmed IEA correspondence are here —
+// G100~G500 and V100~V400 are policy/planning offices with no technology of
+// their own (the report gives them a category-level "relevant technology
+// map" instead, which isn't a curated list suitable for an exact filter),
+// and sub-groups with zero matches (D100, J200, N300, P100~P300, R300,
+// U400, U600) are omitted since selecting them would always show nothing.
+const ITRI_SUBGROUP_TECH_MAP = {
+  "C100": { zh: "低碳燃燒與碳循環", en: "Low-Carbon Combustion & Carbon Cycling", techIds: ["tech_0013_co2-capture-in-the-bayer-process", "tech_0014_primary-smelting-with-integrated-co2-cap", "tech_0021_calcium-looping-carbon-capture", "tech_0022_chemical-absorption-full-capture-rates", "tech_0023_chemical-absorption-partial-capture-rate", "tech_0024_cryogenic-carbon-capture", "tech_0025_direct-separation-carbon-capture", "tech_0026_membrane-separation-carbon-capture", "tech_0027_novel-physical-adsorption-carbon-capture", "tech_0028_oxy-fuelling-and-carbon-capture", "tech_0106_conversion-of-steel-offgases-to-chemical", "tech_0107_carbon-recycling-through-thermochemical-", "tech_0108_chemical-absorption-carbon-capture-and-p", "tech_0109_conversion-of-steel-offgases-to-ethanol-", "tech_0110_smelting-with-integrated-co2-capture", "tech_0059_high-value-chemicals-production-using-ch", "tech_0075_methanol-production-with-co2-capture-hig", "tech_0101_dri-production-based-on-chemical-absorpt", "tech_0104_dri-production-based-on-physical-adsorpt", "tech_0053_haber-bosch-process-using-hydrogen-produ", "tech_0054_haber-bosch-process-using-hydrogen-produ", "tech_0518_coal-gasification-high-capture-rates", "tech_0520_steam-reforming-high-capture-rates", "tech_0521_steam-reforming-partial-capture", "tech_0524_electrified-steam-reforming", "tech_0525_sorption-enhanced-steam-reforming", "tech_0333_post-combustion-chemical-absorption-coal", "tech_0334_post-combustion-membranes-polymeric-coal", "tech_0335_post-combustion-solid-adsorption-coal-wi", "tech_0336_pre-combustion-physical-absorption-coal-", "tech_0337_supercritical-co2-cycle-coal-with-ccus", "tech_0342_post-combustion-chemical-absorption-natu", "tech_0343_supercritical-co2-cycle-natural-gas-with", "tech_0399_post-combustion-chemical-absorption-biom", "tech_0400_post-combustion-solid-adsorption-biomass", "tech_0401_pre-combustion-physical-absorption-bioma", "tech_0516_biomass-waste-gasification-with-ccus", "tech_0526_partial-oxidation-with-ccus", "tech_0032_carbonation-of-calcium-silicates", "tech_0599_co2-sequestration-in-inert-carbonate-mat", "tech_0500_co-firing-of-ammonia-in-coal-power-plant", "tech_0501_co-firing-of-ammonia-in-gas-turbines", "tech_0481_ammonia-cracking-reformer", "tech_0482_ammonia-cracking-catalytic-membrane"] },
+  "C200": { zh: "電池儲能系統", en: "Battery Energy Storage Systems", techIds: ["tech_0547_zinc-manganese-oxide-storage-battery", "tech_0548_lithium-ion-storage-battery", "tech_0549_metal-air-storage-battery", "tech_0550_redox-flow-storage-battery", "tech_0551_sodium-ion-storage-battery", "tech_0620_automatic-battery-recycling", "tech_0621_ev-battery-reuse-in-bess", "tech_0622_battery-passport", "tech_0623_battery-direct-recycling", "tech_0624_hydrometallurgical-battery-recycling", "tech_0625_use-of-a-pyro-hydro-metallurgy-combo-for", "tech_0626_pyrometallurgical-smelting-for-battery-r"] },
+  "C300": { zh: "生質能應用", en: "Bioenergy Applications", techIds: ["tech_0372_alcohol-to-jet-biokerosene", "tech_0373_transesterification-of-oil-fats-to-fatty", "tech_0374_gasification-and-fischer-tropsch-integra", "tech_0375_gasification-and-fischer-tropsch-without", "tech_0376_gasification-and-fischer-tropsch-with-hy", "tech_0377_hydrotreating-of-oil-fats-to-hydrogenate", "tech_0378_hydrothermal-liquefaction-and-upgrading-", "tech_0379_hydrothermal-liquefaction-and-upgrading-", "tech_0380_hydrotreating-of-micro-algae-biodiesel-b", "tech_0381_pyrolysis-and-upgrading-biodiesel", "tech_0382_synthetic-iso-paraffins", "tech_0383_transesterification-of-micro-algae-to-fa", "tech_0384_hydrothermal-liquefaction-and-upgrading-", "tech_0385_enzymatic-fermentation-of-lignocellulosi", "tech_0386_enzymatic-fermentation-of-sugar-or-starc", "tech_0387_enzymatic-fermentation-of-lignocellulosi", "tech_0388_enzymatic-fermentation-of-sugar-or-starc", "tech_0389_syngas-fermentation-bioethanol", "tech_0390_anaerobic-digestion-without-biogas-upgra", "tech_0391_anaerobic-digestion-and-biological-metha", "tech_0392_anaerobic-digestion-and-catalytic-methan", "tech_0393_anaerobic-digestion-and-upgrading-with-c", "tech_0394_anaerobic-digestion-and-upgrading-withou", "tech_0395_biomass-gasification-small-scale-bio-syn", "tech_0396_biomass-gasification-and-biological-meth", "tech_0397_biomass-gasification-and-catalytic-metha", "tech_0398_biomass-gasification-and-methanation-int", "tech_0399_post-combustion-chemical-absorption-biom", "tech_0400_post-combustion-solid-adsorption-biomass", "tech_0401_pre-combustion-physical-absorption-bioma", "tech_0065_recycling-via-chemical-depolymerisation-", "tech_0066_recycling-via-chemical-depolymerisation-", "tech_0068_pyrolysis-recycling", "tech_0064_recycling-via-solvent-dissolution-for-pp", "tech_0069_recycling-via-solvent-dissolution-for-pe", "tech_0071_methanol-production-using-biomass-and-wa", "tech_0135_black-liquor-gasification-and-valorisati", "tech_0138_pyrolysis-of-by-product-streams", "tech_0530_biomass-waste-pyrolysis"] },
+  "C400": { zh: "氫氨能應用", en: "Hydrogen & Ammonia Applications", techIds: ["tech_0503_alkaline-electrolyser", "tech_0504_anion-exchange-membrane-electrolyser", "tech_0505_polymer-electrolyte-membrane-electrolyse", "tech_0506_solid-oxide-electrolyser-cell", "tech_0494_h2-blending-in-natural-gas-turbine", "tech_0495_molten-carbonates-fuel-cell", "tech_0496_pure-h2-gas-turbine", "tech_0497_solid-oxide-fuel-cell", "tech_0498_hybrid-hydrogen-fuel-cell-gas-turbine-sy", "tech_0224_fuel-cell-micro-chp-for-buildings"] },
+  "D200": { zh: "先進電源系統研究室", en: "Advanced Power Systems Lab", techIds: ["tech_0156_fibre-optic-daylighting", "tech_0157_lighting-control-system", "tech_0158_conventional-led", "tech_0159_direct-current-lighting", "tech_0160_organic-led"] },
+  "D300": { zh: "熱能系統研究室", en: "Thermal Energy Systems Lab", techIds: ["tech_0414_organic-rankine-cycle-low-temperature-re", "tech_0317_ship-engine-waste-heat-recovery"] },
+  "D400": { zh: "感測監控系統研究室", en: "Sensing & Monitoring Systems Lab", techIds: ["tech_0155_building-energy-management-software", "tech_0150_active-control-systems", "tech_0147_smart-meter"] },
+  "D500": { zh: "潔淨暨乾燥系統研究室", en: "Clean & Drying Systems Lab", techIds: ["tech_0202_liquid-or-solid-desiccant-evaporative-co"] },
+  "H100": { zh: "地熱能源開採技術研究室", en: "Geothermal Energy Extraction Tech Lab", techIds: ["tech_0409_enhanced-geothermal-systems", "tech_0612_bioleaching"] },
+  "H200": { zh: "海洋能源技術研究室", en: "Ocean Energy Technology Lab", techIds: ["tech_0363_wave-energy-converters-wave-energy", "tech_0366_tidal-stream-ocean-current-energy", "tech_0361_ocean-cross-cutting", "tech_0368_floating-offshore-wind-turbine", "tech_0370_onshore-wind", "tech_0371_seabed-fixed-offshore-wind-turbine"] },
+  "H300": { zh: "碳封存與地質探勘技術研究室", en: "Carbon Storage & Geological Exploration Tech Lab", techIds: ["tech_0602_advanced-co2-storage-monitoring-technolo", "tech_0605_co2-storage-in-saline-formation"] },
+  "J100": { zh: "機電關鍵組件研究室", en: "Electromechanical Key Components Lab", techIds: ["tech_0194_variable-refrigerant-flow-heat-pump"] },
+  "J300": { zh: "建築節能研究室", en: "Building Energy Efficiency Lab", techIds: ["tech_0161_building-design-optimization-tools"] },
+  "J400": { zh: "高速流機研究室", en: "High-Speed Turbomachinery Lab", techIds: ["tech_0223_heat-recovery-chiller"] },
+  "N100": { zh: "空氣污染防制研究室", en: "Air Pollution Control Lab", techIds: ["tech_0355_plasma-catalytic-processes-for-methane-a"] },
+  "N200": { zh: "淨零與調適策略研究室", en: "Net-Zero & Adaptation Strategy Lab", techIds: ["tech_0214_natural-hydrocarbon-refrigerants"] },
+  "N400": { zh: "循環材料與分析研究室", en: "Circular Materials & Analysis Lab", techIds: ["tech_0481_ammonia-cracking-reformer", "tech_0355_plasma-catalytic-processes-for-methane-a"] },
+  "P400": { zh: "智慧循環技術研究室", en: "Smart Circular Technology Lab", techIds: ["tech_0622_battery-passport"] },
+  "R100": { zh: "矽基太陽電池研究室", en: "Silicon-Based Solar Cell Lab", techIds: ["tech_0417_crystalline-silicon-pv"] },
+  "R200": { zh: "先進光電材料研究室", en: "Advanced Photovoltaic Materials Lab", techIds: ["tech_0421_perovskite-thin-film", "tech_0417_crystalline-silicon-pv", "tech_0419_multi-junction-cell-pv"] },
+  "R400": { zh: "光電整合應用研究室", en: "PV Integration & Applications Lab", techIds: ["tech_0418_floating-solar-pv"] },
+  "U100": { zh: "電力系統研究室", en: "Power Systems Lab", techIds: ["tech_0588_virtual-inertia", "tech_0593_power-grid-equipment-monitoring-systems"] },
+  "U200": { zh: "電力電子研究室", en: "Power Electronics Lab", techIds: ["tech_0586_battery-storage-system-with-grid-forming", "tech_0589_virtual-power-plants", "tech_0592_smart-inverter", "tech_0580_solid-state-transformers-ssts", "tech_0273_inductive-charging"] },
+  "U300": { zh: "電網與自動化研究室", en: "Grid & Automation Lab", techIds: ["tech_0155_building-energy-management-software", "tech_0593_power-grid-equipment-monitoring-systems"] },
+  "U500": { zh: "用戶電力資源整合研究室", en: "Customer-Side Power Resource Integration Lab", techIds: ["tech_0147_smart-meter", "tech_0270_vehicle-to-grid-v2g", "tech_0271_smart-charging-transport-demand-response", "tech_0153_programmable-thermostat", "tech_0149_gamification-devices-for-buildings-energ"] },
+};
+const ITRI_SUBGROUP_ORDER = ["C100", "C200", "C300", "C400", "D200", "D300", "D400", "D500", "H100", "H200", "H300", "J100", "J300", "J400", "N100", "N200", "N400", "P400", "R100", "R200", "R400", "U100", "U200", "U300", "U500"];
+
 const SECTOR_TRANSLATIONS = {
   "Industry": "工業", "Aluminium": "鋁", "Metallic products": "金屬產品",
   "Cement and concrete": "水泥與混凝土", "Chemicals and plastics": "化學品與塑膠",
@@ -1086,6 +1123,7 @@ const APP_LABELS = {
     subjectSearch: '技術主題查詢',
     fulltextSearch: 'IEA 全文查詢',
     allSectors: '所有官方分類 (All Sectors)',
+    itriGroupLabel: '工研院綠能所對應技術',
     searchPlaceholder: '輸入關鍵字 (例: hydrogen)...',
     searchHint: '技術主題查詢以技術名稱與分類為主；IEA 全文查詢另納入描述中提及的應用、能源來源與供應鏈關聯。',
     resultsCount: (n, page, totalPages) => `共 ${n} 筆｜第 ${page} / ${totalPages} 頁`,
@@ -1180,6 +1218,7 @@ const APP_LABELS = {
     subjectSearch: 'Subject search',
     fulltextSearch: 'IEA full-text search',
     allSectors: 'All Sectors',
+    itriGroupLabel: 'ITRI Green Energy Institute Mapping',
     searchPlaceholder: 'Enter a keyword (e.g. hydrogen)...',
     searchHint: 'Subject search matches technology names and categories; IEA full-text search also matches applications, energy sources and supply chains mentioned in the descriptions.',
     resultsCount: (n, page, totalPages) => `${n} results | page ${page} / ${totalPages}`,
@@ -3724,13 +3763,22 @@ function Dashboard({
     // completely different top-level sector).
     const sectorParts = selectedSector ? selectedSector.split('|') : [];
     const lowerSector = sectorParts.length ? sectorParts[sectorParts.length - 1].trim().toLowerCase() : '';
+    // "ITRI|C100" style values pick one of the curated 工研院綠能所 sub-group
+    // -> IEA technology lists instead of a live tech.sector path match — see
+    // ITRI_SUBGROUP_TECH_MAP. Membership is an exact, hand-audited technology
+    // ID list, so (unlike the sector dropdown) there's no fulltext fallback:
+    // a technology either is or isn't in that sub-group's collected list.
+    const isItriFilter = sectorParts[0] === 'ITRI';
+    const itriTechIds = isItriFilter ? (ITRI_SUBGROUP_TECH_MAP[sectorParts[1]]?.techIds || []) : null;
 
     const expandedQueries = lowerQuery ? (SEARCH_ALIASES[lowerQuery] || [lowerQuery]) : [];
 
     let results = rows.map(tech => {
       let score = 0, isDirectHit = false, isDescHit = false;
       const isSectorMatch = selectedSector
-        ? Array.isArray(tech.sector) && tech.sector[1] === sectorParts[0] && (sectorParts.length < 2 || tech.sector[2] === sectorParts[1])
+        ? (isItriFilter
+            ? itriTechIds.includes(tech._id)
+            : Array.isArray(tech.sector) && tech.sector[1] === sectorParts[0] && (sectorParts.length < 2 || tech.sector[2] === sectorParts[1]))
         : true;
       const subjectTexts = [tech.technology_name, tech.technology_name_zh].filter(Boolean).map(s => String(s).toLowerCase());
       const descTexts = [tech.description, tech.description_en, tech.description_zh, tech.technology_status_summary_zh, tech.market_dynamics_summary_zh, tech.NZErationale, tech.NZErationale_zh, tech.nze_rationale, tech.supplyChain, tech.supply_chain, tech.theme].filter(Boolean).map(s => String(s).toLowerCase());
@@ -3760,7 +3808,9 @@ function Dashboard({
       } else if (searchMode === 'fulltext') {
         if (selectedSector) {
           if (isSectorMatch) { score += 1; isDirectHit = true; }
-          else {
+          else if (isItriFilter) {
+            passesSectorFilter = false;
+          } else {
             let sectorDescHit = false;
             for (const text of descTexts) { const hits = countOccurrences(text, lowerSector); if (hits > 0) { score += hits; sectorDescHit = true; isDescHit = true; } }
             if (!sectorDescHit) passesSectorFilter = false;
@@ -4181,6 +4231,13 @@ function Dashboard({
                           {subsectors.map(sub => <option key={sub} value={`${sector}|${sub}`}>↳ {uiLang === 'en' ? sub : `${sub} (${SECTOR_TRANSLATIONS[sub] || ''})`}</option>)}
                         </optgroup>
                       ))}
+                      <optgroup label={L.itriGroupLabel}>
+                        {ITRI_SUBGROUP_ORDER.map(code => (
+                          <option key={code} value={`ITRI|${code}`}>
+                            {code} {uiLang === 'en' ? ITRI_SUBGROUP_TECH_MAP[code].en : ITRI_SUBGROUP_TECH_MAP[code].zh}
+                          </option>
+                        ))}
+                      </optgroup>
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
                       <svg className="fill-current h-4 w-4" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
