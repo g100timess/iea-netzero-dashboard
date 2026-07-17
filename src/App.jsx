@@ -2972,7 +2972,9 @@ export default function App() {
     const T = APP_LABELS[uiLang];
     setAppState({ status: 'loading', errorMsg: '', fileName: T.loadingFromGithub });
     try {
-      const response = await fetch(DATA_URL);
+      // Cache-bust so every page load re-fetches the latest JSON instead of
+      // reusing whatever the browser cached for this same URL last time.
+      const response = await fetch(`${DATA_URL}?t=${Date.now()}`);
       if (!response.ok) throw new Error(`狀態碼: ${response.status}`);
       const parsed = await response.json();
       const rawRows = extractRowsWithIds(parsed);
@@ -3690,7 +3692,7 @@ function Dashboard({
     const raw = dataset?.generated_at;
     const d = raw ? new Date(raw) : null;
     if (!d || isNaN(d.getTime())) return '—';
-    return d.toLocaleString(uiLang === 'en' ? 'en-US' : 'zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString(uiLang === 'en' ? 'en-US' : 'zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
   })();
 
   // Small reminder of the next scheduled case-data refresh (every Monday
