@@ -28755,7 +28755,7 @@
     },
     "tech_0505_polymer-electrolyte-membrane-electrolyse": {
       "technology_name": "Polymer electrolyte membrane electrolyser",
-      "technology_name_zh": "高分子電解質膜電解槽",
+      "technology_name_zh": "質子交換膜電解槽",
       "sector_zh": "電解槽設計",
       "sector": [
         "large-scale or industrial",
@@ -28824,7 +28824,7 @@
       ],
       "adoption_stage": "Awaiting adoption",
       "id": "Hydrogen > Production > Electrolysis > Electrolyser design > Polymer electrolyte membrane electrolyser",
-      "id_zh": "氫能 > 生產 > 電解 > 電解槽設計 > 高分子電解質膜電解槽"
+      "id_zh": "氫能 > 生產 > 電解 > 電解槽設計 > 質子交換膜電解槽"
     },
     "tech_0506_solid-oxide-electrolyser-cell": {
       "technology_name": "Solid oxide electrolyser cell",
