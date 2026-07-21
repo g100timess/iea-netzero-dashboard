@@ -1264,6 +1264,8 @@ const APP_LABELS = {
     pathBreadcrumbLabel: '分類路徑（點擊可篩選同路徑的技術）',
     pathFilterActive: '路徑篩選中',
     clearPathFilter: '清除路徑篩選',
+    backOneLevel: '返回上一層',
+    forwardOneLevel: '前進下一層',
     summaryTitle: '中文摘要',
     marketTitle: '市場與示範動態',
     aiDisclaimer: '提醒：中文摘要由 AI 輔助生成，正式引用前請核對原始 IEA 資料。',
@@ -1353,6 +1355,8 @@ const APP_LABELS = {
     pathBreadcrumbLabel: 'Classification path (click a segment to filter matching technologies)',
     pathFilterActive: 'Path filter active',
     clearPathFilter: 'Clear path filter',
+    backOneLevel: 'Back one level',
+    forwardOneLevel: 'Forward one level',
     summaryTitle: 'Summary',
     marketTitle: 'Market & Deployment Dynamics',
     aiDisclaimer: 'Note: this summary was AI-assisted and cached from the source data; verify against the original IEA data before formal citation.',
@@ -3149,7 +3153,24 @@ export default function App() {
   // tech.sector — clicking "Aluminium" must not also pull in an unrelated
   // "Aluminium" appearing at a different depth under a different top
   // category. See searchData below for the matching logic.
-  const [pathFilter, setPathFilter] = useState(null);
+  // Browser-history-style undo/redo for pathFilter: history[index] is the
+  // live value; setPathFilter (really navigatePathFilter, below) is every
+  // *new* navigation — donut-slice clicks, breadcrumb clicks, the sector
+  // dropdown clearing it, the "clear path filter" button — and truncates
+  // anything past the current index, same as a browser discarding forward
+  // history once you navigate somewhere new after going back. "Back"/
+  // "forward" only move the index; they don't touch the stack itself.
+  const [pathFilterHistory, setPathFilterHistory] = useState([null]);
+  const [pathFilterIndex, setPathFilterIndex] = useState(0);
+  const pathFilter = pathFilterHistory[pathFilterIndex];
+  const setPathFilter = (value) => {
+    setPathFilterHistory(prev => [...prev.slice(0, pathFilterIndex + 1), value]);
+    setPathFilterIndex(i => i + 1);
+  };
+  const pathFilterBack = () => setPathFilterIndex(i => Math.max(0, i - 1));
+  const pathFilterForward = () => setPathFilterIndex(i => Math.min(pathFilterHistory.length - 1, i + 1));
+  const canPathFilterBack = pathFilterIndex > 0;
+  const canPathFilterForward = pathFilterIndex < pathFilterHistory.length - 1;
   // Lifted out of Dashboard so handleJumpToTech (below) can switch back to
   // the "技術詳情" tab when a slide reference is clicked from inside the AI
   // modal — otherwise selectedTech updates invisibly behind whichever tab
@@ -3593,6 +3614,10 @@ export default function App() {
         setSelectedSector={setSelectedSector}
         pathFilter={pathFilter}
         setPathFilter={setPathFilter}
+        onPathFilterBack={pathFilterBack}
+        onPathFilterForward={pathFilterForward}
+        canPathFilterBack={canPathFilterBack}
+        canPathFilterForward={canPathFilterForward}
         onOpenStrategyOverview={handleOpenStrategyOverview}
         apiKey={apiKey}
         onApiKeyChange={handleApiKeyChange}
@@ -4026,6 +4051,7 @@ function Dashboard({
   selectedTech, setSelectedTech,
   selectedSector, setSelectedSector,
   pathFilter, setPathFilter,
+  onPathFilterBack, onPathFilterForward, canPathFilterBack, canPathFilterForward,
   onOpenStrategyOverview,
   apiKey, onApiKeyChange,
   aiProvider, onProviderChange,
@@ -4925,13 +4951,13 @@ function Dashboard({
                   </div>
 
                   <div className="flex flex-col lg:flex-row gap-6 items-stretch">
-                    {/* Sector-distribution donut — a purely informational
-                        preview (no click/navigation of its own) of the
-                        current search results, so it doesn't compete with
-                        the two action cards as a third entry point. Same
-                        plain-white-card look as the two beside it, just
-                        with a blue accent, for a cleaner and more cohesive
-                        page instead of a separate dark "control room" card. */}
+                    {/* Sector-distribution donut — same plain-white-card look
+                        as the two cards beside it, just with a blue accent,
+                        for a cleaner and more cohesive page instead of a
+                        separate dark "control room" card. Clicking a slice
+                        drills the left-hand list down to that category (see
+                        handleDonutSegmentClick); the "back one level" button
+                        below undoes that one step at a time. */}
                     {totalMatches > 0 && (
                       <div className="lg:w-[340px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-blue-500 p-6 md:p-8 flex flex-col items-center">
                         <h3 className="text-lg font-bold text-slate-800 mb-1 self-start">{L.sectorDistributionTitle}</h3>
@@ -4948,6 +4974,28 @@ function Dashboard({
                           strokeWidth={22}
                           onLockChange={handleDonutSegmentClick}
                         />
+                        {(canPathFilterBack || canPathFilterForward) && (
+                          <div className="flex items-center gap-2 mt-5">
+                            {canPathFilterBack && (
+                              <button
+                                onClick={onPathFilterBack}
+                                title={L.backOneLevel}
+                                className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                <ChevronLeft size={14} /> {L.backOneLevel}
+                              </button>
+                            )}
+                            {canPathFilterForward && (
+                              <button
+                                onClick={onPathFilterForward}
+                                title={L.forwardOneLevel}
+                                className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                {L.forwardOneLevel} <ChevronRight size={14} />
+                              </button>
+                            )}
+                          </div>
+                        )}
                         {lockedSectorSummary && (
                           <p className="text-base text-slate-600 leading-relaxed mt-5 pt-4 border-t border-slate-100 self-stretch">
                             {lockedSectorSummary}
