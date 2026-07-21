@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, FileJson, AlertCircle, ChevronLeft, ChevronRight, Database, FileText, Info, CheckCircle2, Download, Sparkles, X, Loader2, KeyRound, Eye, EyeOff, RotateCcw, Copy, ExternalLink, ChevronDown, ChevronUp, Globe, HelpCircle, Presentation } from 'lucide-react';
+import { Search, AlertCircle, ChevronLeft, ChevronRight, Database, FileText, Info, CheckCircle2, Download, Sparkles, X, Loader2, KeyRound, Eye, EyeOff, RotateCcw, Copy, ExternalLink, ChevronDown, ChevronUp, Globe, HelpCircle, Presentation } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } from 'docx';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
@@ -109,7 +109,106 @@ const ITRI_SUBGROUP_TECH_MAP = {
   "U300": { zh: "電網與自動化研究室", en: "Grid & Automation Lab", techIds: ["tech_0155_building-energy-management-software", "tech_0593_power-grid-equipment-monitoring-systems"] },
   "U500": { zh: "用戶電力資源整合研究室", en: "Customer-Side Power Resource Integration Lab", techIds: ["tech_0147_smart-meter", "tech_0270_vehicle-to-grid-v2g", "tech_0271_smart-charging-transport-demand-response", "tech_0153_programmable-thermostat", "tech_0149_gamification-devices-for-buildings-energ"] },
 };
-const ITRI_SUBGROUP_ORDER = ["C100", "C200", "C300", "C400", "D200", "D300", "D400", "D500", "H100", "H200", "H300", "J100", "J300", "J400", "N100", "N200", "N400", "P400", "R100", "R200", "R400", "U100", "U200", "U300", "U500"];
+// Sub-groups with no curated exact-technology list (G100~G500, V100~V400: pure
+// policy/planning offices with no R&D of their own; D100/J200/P100~P300/R300/
+// U400/U600: zero item-level IEA matches per the audit report) still get a
+// dropdown entry — pointing at whichever existing official sector(s) cover
+// what that office's work is *about*, exactly like the report's own
+// "相關技術地圖" treatment of G/V. "categories" entries are the same
+// "Top" / "Top|Sub" strings FIXED_SECTORS already uses. A single category
+// means the sub-group itself is the selectable leaf (no further nesting); 2+
+// categories means the sub-group becomes an expandable node whose children
+// are those categories (e.g. G100 > Renewables) — selecting the sub-group
+// itself still matches the union of all of them. N300 (化災應變研究室) has no
+// entry at all — the report is explicit that it has zero conceptual overlap
+// with any energy/net-zero technology, so forcing a category link here would
+// misrepresent it rather than help navigation.
+const ITRI_SUBGROUP_CATEGORY_MAP = {
+  "D100": { zh: "能源效率推動研究室", en: "Energy Efficiency Promotion Lab", categories: ["Buildings|Operations and equipment"] },
+  "G100": { zh: "能源與淨零策略研究室", en: "Energy & Net-Zero Strategy Lab", categories: ["Renewables", "Hydrogen", "Carbon Capture and Storage", "Nuclear", "Energy networks and storage", "Industry", "Transport", "Buildings"] },
+  "G200": { zh: "能源環社整合規劃研究室", en: "Energy-Society Integration Planning Lab", categories: ["Renewables|Solar", "Renewables|Hydropower", "Energy networks and storage|Smart grids"] },
+  "G300": { zh: "產業節能服務室", en: "Industrial Energy Efficiency Service Office", categories: ["Industry", "Carbon Capture and Storage", "Energy networks and storage|Smart grids"] },
+  "G400": { zh: "住商節能推動室", en: "Residential & Commercial Energy Efficiency Promotion Office", categories: ["Buildings|Operations and equipment", "Buildings|Design and envelope", "Buildings|Cooking technologies"] },
+  "G500": { zh: "淨零韌性治理研究室", en: "Net-Zero Resilience Governance Lab", categories: ["Renewables", "Critical minerals", "Energy networks and storage"] },
+  "J200": { zh: "智慧控制設備研究室", en: "Smart Control Equipment Lab", categories: ["Buildings|Operations and equipment"] },
+  "P100": { zh: "環境管理研究室", en: "Environmental Management Lab", categories: ["Industry", "Carbon Capture and Storage"] },
+  "P200": { zh: "微污染分析研究室", en: "Micro-Pollutant Analysis Lab", categories: ["Carbon Capture and Storage", "Transport|Road transport"] },
+  "P300": { zh: "資源循環技術研究室", en: "Resource Circulation Technology Lab", categories: ["Critical minerals|E-waste recycling"] },
+  "R300": { zh: "太陽光電系統與可靠度研究室", en: "Solar PV Systems & Reliability Lab", categories: ["Renewables|Solar"] },
+  "U400": { zh: "防爆與電性安全研究室", en: "Explosion-Proof & Electrical Safety Lab", categories: ["Energy networks and storage|Physical grids"] },
+  "U600": { zh: "電力監管推動研究室", en: "Electricity Market Regulation Promotion Office", categories: ["Energy networks and storage"] },
+  "V100": { zh: "再生能源專案室", en: "Renewable Energy Project Office", categories: ["Renewables"] },
+  "V200": { zh: "風力發電推動室", en: "Wind Power Promotion Office", categories: ["Renewables|Wind", "Energy networks and storage"] },
+  "V300": { zh: "太陽光電政策與法規策略研究室", en: "Solar PV Policy & Regulatory Strategy Lab", categories: ["Renewables|Solar"] },
+  "V400": { zh: "太陽光電永續專案推動室", en: "Solar PV Sustainability Project Promotion Office", categories: ["Renewables|Solar"] },
+};
+
+const ITRI_SUBGROUP_ORDER = [
+  "C100", "C200", "C300", "C400",
+  "D100", "D200", "D300", "D400", "D500",
+  "G100", "G200", "G300", "G400", "G500",
+  "H100", "H200", "H300",
+  "J100", "J200", "J300", "J400",
+  "N100", "N200", "N400",
+  "P100", "P200", "P300", "P400",
+  "R100", "R200", "R300", "R400",
+  "U100", "U200", "U300", "U400", "U500", "U600",
+  "V100", "V200", "V300", "V400",
+];
+
+// Groups the sub-group codes above by their leading letter (C/D/G/H/J/N/P/R/U/V)
+// for the collapsible "技術研究領域分類 > ITRI GEL > <letter> > <code>" branch
+// of the sector dropdown — preserves ITRI_SUBGROUP_ORDER's ordering within
+// each letter.
+const ITRI_LETTER_GROUPS = {};
+ITRI_SUBGROUP_ORDER.forEach(code => {
+  const letter = code.match(/^[A-Za-z]+/)[0];
+  if (!ITRI_LETTER_GROUPS[letter]) ITRI_LETTER_GROUPS[letter] = [];
+  ITRI_LETTER_GROUPS[letter].push(code);
+});
+const ITRI_LETTER_ORDER = Object.keys(ITRI_LETTER_GROUPS);
+
+// Single lookup covering both curated-list sub-groups (ITRI_SUBGROUP_TECH_MAP)
+// and category-proxy sub-groups (ITRI_SUBGROUP_CATEGORY_MAP), for anything
+// that only needs the display name (zh/en), not the matching logic.
+function getItriSubgroupInfo(code) {
+  return ITRI_SUBGROUP_TECH_MAP[code] || ITRI_SUBGROUP_CATEGORY_MAP[code];
+}
+
+// Matches a tech against one "Top" or "Top|Sub" category reference — the same
+// positional tech.sector check the official-sector branch of the dropdown
+// already uses.
+function matchesCategoryRef(tech, ref) {
+  const [top, sub] = ref.split('|');
+  return Array.isArray(tech.sector) && tech.sector[1] === top && (!sub || tech.sector[2] === sub);
+}
+
+// Whether `tech` belongs to one ITRI sub-group code, regardless of whether
+// that code is an exact curated technology list or a category-proxy.
+function subgroupMatchesTech(code, tech) {
+  const exact = ITRI_SUBGROUP_TECH_MAP[code];
+  if (exact) return exact.techIds.includes(tech._id);
+  const proxy = ITRI_SUBGROUP_CATEGORY_MAP[code];
+  if (proxy) return proxy.categories.some(ref => matchesCategoryRef(tech, ref));
+  return false;
+}
+
+// selectedSector values for this branch are pipe-delimited paths rooted at
+// "ITRI": "ITRI" (技術研究領域分類) and "ITRI|GEL" (ITRI GEL) both match every
+// technology covered by any sub-group; "ITRI|GEL|<letter>" matches that
+// letter group's combined set; "ITRI|GEL|<letter>|<code>" matches one
+// sub-group (its exact list, or the union of all its proxy categories);
+// "ITRI|GEL|<letter>|<code>|<categoryIndex>" — only valid for a proxy
+// sub-group with 2+ categories — matches just that one category (e.g.
+// G100's 3rd child, "Carbon Capture and Storage").
+function itriMatchesTech(sectorParts, tech) {
+  if (sectorParts.length <= 2) return ITRI_SUBGROUP_ORDER.some(code => subgroupMatchesTech(code, tech));
+  if (sectorParts.length === 3) return (ITRI_LETTER_GROUPS[sectorParts[2]] || []).some(code => subgroupMatchesTech(code, tech));
+  if (sectorParts.length === 4) return subgroupMatchesTech(sectorParts[3], tech);
+  const proxy = ITRI_SUBGROUP_CATEGORY_MAP[sectorParts[3]];
+  const ref = proxy?.categories?.[parseInt(sectorParts[4], 10)];
+  return ref ? matchesCategoryRef(tech, ref) : false;
+}
 
 const SECTOR_TRANSLATIONS = {
   "Industry": "工業", "Aluminium": "鋁", "Metallic products": "金屬產品",
@@ -1125,13 +1224,11 @@ const APP_LABELS = {
     openRouterModelPlaceholder: '模型 ID，例如 openai/gpt-4o-mini',
     hideKey: '隱藏金鑰',
     showKey: '顯示金鑰',
-    uploadJson: '選擇 JSON 檔案',
-    rawFormatDetected: '偵測到原始英文技術資料（無中文摘要），已自動切換為英文顯示',
-    restoreDefaultData: '還原為預設資料',
     subjectSearch: '技術主題查詢',
     fulltextSearch: 'IEA 全文查詢',
     allSectors: '所有官方分類 (All Sectors)',
-    itriGroupLabel: '工研院綠能所對應技術',
+    researchFieldLabel: '技術研究領域分類',
+    itriGelLabel: 'ITRI GEL (工研院綠能所)',
     searchPlaceholder: '輸入關鍵字 (例: hydrogen)...',
     searchHint: '技術主題查詢以技術名稱與分類為主；IEA 全文查詢另納入描述中提及的應用、能源來源與供應鏈關聯。',
     resultsCount: (n, page, totalPages) => `共 ${n} 筆｜第 ${page} / ${totalPages} 頁`,
@@ -1150,7 +1247,6 @@ const APP_LABELS = {
     exportStrategyTitle: '匯出完整查詢結果',
     exportStrategyDescPrefix: '將目前符合條件的全部',
     exportStrategyDescSuffix: '筆技術資料匯出為 CSV 檔案。',
-    emptyPrompt: '請輸入關鍵字或選擇官方分類開始查詢',
     noMatch: '找不到符合條件的技術資料',
     directHit: '直接相關',
     descHit: '描述提及',
@@ -1200,9 +1296,6 @@ const APP_LABELS = {
     remoteFormatError: '遠端檔案格式錯誤：找不到有效的技術陣列資料。',
     networkLoadFailed: (msg) => `網路載入失敗: ${msg}`,
     autoLoadFailed: '自動載入失敗',
-    fileLoadFailed: '檔案載入失敗：解析後找不到有效的技術資料。',
-    jsonParseFailed: (msg) => `JSON 解析失敗: ${msg}`,
-    localFileReadError: '讀取本機檔案時發生系統錯誤。',
     backToAiSlides: '返回 AI 簡報預覽'
   },
   en: {
@@ -1220,13 +1313,11 @@ const APP_LABELS = {
     openRouterModelPlaceholder: 'Model ID, e.g. openai/gpt-4o-mini',
     hideKey: 'Hide key',
     showKey: 'Show key',
-    uploadJson: 'Choose JSON file',
-    rawFormatDetected: 'Detected the raw English source (no Chinese summaries) — switched to English display automatically',
-    restoreDefaultData: 'Restore default data',
     subjectSearch: 'Subject search',
     fulltextSearch: 'IEA full-text search',
     allSectors: 'All Sectors',
-    itriGroupLabel: 'ITRI Green Energy Institute Mapping',
+    researchFieldLabel: 'Technology Research Field Classification',
+    itriGelLabel: 'ITRI GEL (工研院綠能所)',
     searchPlaceholder: 'Enter a keyword (e.g. hydrogen)...',
     searchHint: 'Subject search matches technology names and categories; IEA full-text search also matches applications, energy sources and supply chains mentioned in the descriptions.',
     resultsCount: (n, page, totalPages) => `${n} results | page ${page} / ${totalPages}`,
@@ -1245,7 +1336,6 @@ const APP_LABELS = {
     exportStrategyTitle: 'Export Full Query Results',
     exportStrategyDescPrefix: 'Export all',
     exportStrategyDescSuffix: 'matching technologies as a CSV file.',
-    emptyPrompt: 'Enter a keyword or choose an official category to start searching',
     noMatch: 'No matching technologies found',
     directHit: 'Direct match',
     descHit: 'Mentioned in description',
@@ -1295,9 +1385,6 @@ const APP_LABELS = {
     remoteFormatError: 'Remote file format error: no valid technology array found.',
     networkLoadFailed: (msg) => `Network load failed: ${msg}`,
     autoLoadFailed: 'Auto-load failed',
-    fileLoadFailed: 'File load failed: no valid technology data found after parsing.',
-    jsonParseFailed: (msg) => `JSON parse failed: ${msg}`,
-    localFileReadError: 'A system error occurred while reading the local file.',
     backToAiSlides: 'Back to AI slide preview'
   }
 };
@@ -1500,11 +1587,11 @@ function forceTextCsv(val) {
   return q + '=' + q + q + escaped + q + q + q;
 }
 
-// Only http/https URLs may be rendered as clickable links — a dataset is
-// user-uploadable JSON, so a malicious file could otherwise smuggle a
-// javascript: URL into a link's href (React only warns on those, it does
-// not block them), which on click would run script in the app's origin
-// and could e.g. read the stored API keys.
+// Only http/https URLs may be rendered as clickable links — the dataset's
+// "read_more" fields come from the hosted JSON, so a compromised source file
+// could otherwise smuggle a javascript: URL into a link's href (React only
+// warns on those, it does not block them), which on click would run script
+// in the app's origin and could e.g. read the stored API keys.
 function safeLinkUrl(url) {
   if (typeof url !== 'string') return null;
   return /^https?:\/\//i.test(url.trim()) ? url.trim() : null;
@@ -1556,72 +1643,7 @@ function buildFullDataCsv(techs) {
 // row carries a stable `_id` (the original dataset key, when available). This
 // id is what lets an AI-generated slide point back to an exact technology
 // instead of matching on display name.
-// The IEA's own raw ETP source is a plain array of tech objects — no bilingual
-// summaries, no case records — shaped like {name, sector[], description, trl[],
-// NZErationale, supplyChain[], theme[], keyCountries[], read_more}. This lets a
-// user upload that file directly (instead of only our pre-translated cache)
-// and still get a working, English-only view rather than a broken/blank one.
-function isRawEtpFormat(parsed) {
-  if (!Array.isArray(parsed) || parsed.length === 0) return false;
-  const sample = parsed[0];
-  return typeof sample === 'object' && sample !== null
-    && typeof sample.name === 'string' && Array.isArray(sample.trl)
-    && !('technology_name_zh' in sample) && !('technology_status_summary_zh' in sample);
-}
-
-const RAW_ETP_TRL_YEARS = ['2020', '2021', '2022', '2023', '2024', '2025'];
-
-function slugifyRawEtpName(name, idx) {
-  const s = (name || 'tech').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  return `tech_${String(idx).padStart(4, '0')}_${s.slice(0, 40)}`;
-}
-
-// Maps each raw entry onto the same field shape our own bilingual cache uses
-// (technology_name, trl_2020.., technology_status_summary_en, etc.) so every
-// other part of the app (search, TRL stats, detail view) works unmodified.
-// Chinese fields are left blank rather than guessed — sector_zh gets the raw
-// English sector name instead of staying empty, so sector filters/labels
-// show real text instead of the "未標示" placeholder in either language.
-function normalizeRawEtpRows(parsed) {
-  return parsed.map((t, i) => {
-    const trlArr = Array.isArray(t.trl) ? t.trl : [];
-    const trlFields = {};
-    let lastKnown = '';
-    RAW_ETP_TRL_YEARS.forEach((y, j) => {
-      const v = trlArr[j];
-      trlFields[`trl_${y}`] = v != null ? v : '';
-      if (v != null) lastKnown = v;
-    });
-    const sectorArr = Array.isArray(t.sector) ? t.sector : [];
-    const sectorLeaf = sectorArr[sectorArr.length - 1] || '';
-    return {
-      _id: slugifyRawEtpName(t.name, i),
-      technology_name: t.name || '',
-      technology_name_zh: '',
-      sector_zh: sectorLeaf,
-      sector: sectorArr,
-      sector_en: sectorLeaf,
-      ...trlFields,
-      latest_trl: lastKnown,
-      technology_status_summary_en: t.description || '',
-      technology_status_summary_zh: '',
-      market_dynamics_summary_en: t.NZErationale || '',
-      market_dynamics_summary_zh: '',
-      description: t.description || '',
-      NZErationale: t.NZErationale || '',
-      supplyChain: t.supplyChain || [],
-      theme: t.theme || [],
-      keyCountries: t.keyCountries || [],
-      read_more: t.read_more || null,
-      linked_records_count: 0,
-      initiatives: []
-    };
-  });
-}
-
 function extractRowsWithIds(parsed) {
-  if (isRawEtpFormat(parsed)) return normalizeRawEtpRows(parsed);
-
   let rawRows = [];
   if (Array.isArray(parsed.rows)) rawRows = parsed.rows;
   else if (Array.isArray(parsed)) rawRows = parsed;
@@ -3107,16 +3129,11 @@ export default function App() {
   const [dataset, setDataset] = useState(DEFAULT_JSON);
   const [rows, setRows] = useState(() => extractRowsWithIds(DEFAULT_JSON));
   const [isSampleData, setIsSampleData] = useState(true);
-  // True once the user has loaded their own file via handleFileUpload, so
-  // the header can offer a way back to the app's own bilingual DATA_URL
-  // source without requiring a full page refresh.
-  const [isCustomUpload, setIsCustomUpload] = useState(false);
 
   const [appState, setAppState] = useState({
     status: 'fallback',
     errorMsg: '',
-    fileName: '',
-    isRawFormat: false
+    fileName: ''
   });
 
   const [query, setQuery] = useState('');
@@ -3218,8 +3235,7 @@ export default function App() {
         setDataset(parsed);
         setRows(rawRows);
         setIsSampleData(false);
-        setIsCustomUpload(false);
-        setAppState({ status: 'success', errorMsg: '', fileName: T.githubLoadSuccess, isRawFormat: false });
+        setAppState({ status: 'success', errorMsg: '', fileName: T.githubLoadSuccess });
         setQuery('');
         setSelectedSector('');
       } else {
@@ -3234,40 +3250,6 @@ export default function App() {
     fetchJsonData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setAppState({ status: 'loading', errorMsg: '', fileName: file.name });
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        if (!evt.target?.result) throw new Error("File is empty");
-        const parsed = JSON.parse(evt.target.result);
-        const isRawUpload = isRawEtpFormat(parsed);
-        const rawRows = extractRowsWithIds(parsed);
-        if (rawRows.length > 0) {
-          setDataset(parsed);
-          setRows(rawRows);
-          setIsSampleData(false);
-          setIsCustomUpload(true);
-          // The raw IEA source has no Chinese fields at all — staying in
-          // Chinese mode would just show English fallback text under Chinese
-          // chrome, so switch the whole platform to English automatically.
-          if (isRawUpload) setUiLang('en');
-          setAppState({ status: 'success', errorMsg: '', fileName: file.name, isRawFormat: isRawUpload });
-          setQuery('');
-          setSelectedSector('');
-        } else {
-          setAppState({ status: 'error', errorMsg: APP_LABELS[uiLang].fileLoadFailed, fileName: file.name });
-        }
-      } catch (err) {
-        setAppState({ status: 'error', errorMsg: APP_LABELS[uiLang].jsonParseFailed(err.message), fileName: file.name });
-      }
-    };
-    reader.onerror = () => setAppState({ status: 'error', errorMsg: APP_LABELS[uiLang].localFileReadError, fileName: file.name });
-    reader.readAsText(file);
-  };
 
   // Lets an AI-generated slide reference ("id": "tech_h2_1") resolve back to
   // the actual technology object so the UI can jump to it.
@@ -3601,9 +3583,6 @@ export default function App() {
         rows={rows}
         isSampleData={isSampleData}
         appState={appState}
-        onUpload={handleFileUpload}
-        isCustomUpload={isCustomUpload}
-        onRestoreDefault={fetchJsonData}
         query={query}
         setQuery={setQuery}
         searchMode={searchMode}
@@ -3838,11 +3817,211 @@ function WindTurbineIcon({ className, style, duration }) {
   );
 }
 
+// Custom tree-style sector dropdown — replaces a plain <select> because the
+// ITRI branch needs actual expand/collapse at the letter-group level
+// (C/D/H/J/N/P/R/U default collapsed, hiding C100-C400 etc. until toggled),
+// which native <option>/<optgroup> elements cannot do. Every row's label is
+// independently clickable to filter (matching how "全部 Industry (工業)"
+// already filters its whole top-level category); the small chevron on a
+// letter-group row only toggles that row's children and never changes the
+// selection itself.
+function SectorTreeDropdown({ value, onChange, uiLang, L }) {
+  const [open, setOpen] = useState(false);
+  const [expandedLetters, setExpandedLetters] = useState(() => new Set());
+  const [expandedCodes, setExpandedCodes] = useState(() => new Set());
+  const [itriGelExpanded, setItriGelExpanded] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  const select = (val) => { onChange(val); setOpen(false); };
+  const toggleLetter = (letter) => {
+    setExpandedLetters(prev => {
+      const next = new Set(prev);
+      if (next.has(letter)) next.delete(letter); else next.add(letter);
+      return next;
+    });
+  };
+  const toggleCode = (code) => {
+    setExpandedCodes(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code); else next.add(code);
+      return next;
+    });
+  };
+
+  // Label for one "Top" or "Top|Sub" category reference, matching the same
+  // "全部 X (中文)" / "↳ Sub (中文)" conventions used elsewhere in this
+  // dropdown for FIXED_SECTORS entries.
+  const categoryRefLabel = (ref) => {
+    const [top, sub] = ref.split('|');
+    if (!sub) return uiLang === 'en' ? top : `全部 ${top} (${SECTOR_TRANSLATIONS[top] || ''})`;
+    return uiLang === 'en' ? sub : `↳ ${sub} (${SECTOR_TRANSLATIONS[sub] || ''})`;
+  };
+
+  // Mirrors the same label text the old <select> rendered, so the closed
+  // button's display text matches what a saved/shared "selectedSector" value
+  // used to look like.
+  const currentLabel = useMemo(() => {
+    if (!value) return L.allSectors;
+    const parts = value.split('|');
+    if (parts[0] === 'ITRI') {
+      if (parts.length === 1) return L.researchFieldLabel;
+      if (parts.length === 2) return L.itriGelLabel;
+      if (parts.length === 3) return parts[2];
+      const code = parts[3];
+      const entry = getItriSubgroupInfo(code);
+      const codeLabel = entry ? `${code} ${uiLang === 'en' ? entry.en : entry.zh}` : code;
+      if (parts.length === 4) return codeLabel;
+      const ref = ITRI_SUBGROUP_CATEGORY_MAP[code]?.categories?.[parseInt(parts[4], 10)];
+      return ref ? `${codeLabel} > ${categoryRefLabel(ref).replace(/^↳\s*/, '')}` : codeLabel;
+    }
+    const [top, sub] = parts;
+    if (!sub) return uiLang === 'en' ? top : `全部 ${top} (${SECTOR_TRANSLATIONS[top] || ''})`;
+    return uiLang === 'en' ? sub : `${sub} (${SECTOR_TRANSLATIONS[sub] || ''})`;
+  }, [value, uiLang, L]);
+
+  const rowBase = "w-full text-left px-3 py-1.5 text-sm rounded-md truncate";
+  const rowClass = (rowValue, extra = '') => `${rowBase} ${extra} ${value === rowValue ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'}`;
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-2 pl-3 pr-2 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base bg-white font-medium text-slate-700"
+      >
+        <span className="truncate">{currentLabel}</span>
+        <ChevronDown size={16} className={`text-slate-500 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-80 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg p-1.5 space-y-0.5">
+          <button type="button" onClick={() => select('')} className={rowClass('')}>{L.allSectors}</button>
+
+          {Object.entries(FIXED_SECTORS).map(([sector, subsectors]) => (
+            <div key={sector}>
+              <button type="button" onClick={() => select(sector)} className={rowClass(sector, 'font-semibold')}>
+                {uiLang === 'en' ? sector : `全部 ${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}
+              </button>
+              {subsectors.map(sub => (
+                <button key={sub} type="button" onClick={() => select(`${sector}|${sub}`)} className={rowClass(`${sector}|${sub}`, 'pl-6')}>
+                  ↳ {uiLang === 'en' ? sub : `${sub} (${SECTOR_TRANSLATIONS[sub] || ''})`}
+                </button>
+              ))}
+            </div>
+          ))}
+
+          <div className="border-t border-slate-100 my-1" />
+
+          <button type="button" onClick={() => select('ITRI')} className={rowClass('ITRI', 'font-semibold')}>
+            {L.researchFieldLabel}
+          </button>
+          <div className={`flex items-center gap-1 rounded-md ${value === 'ITRI|GEL' ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setItriGelExpanded(v => !v); }}
+              className="p-1 pl-6 text-slate-400 hover:text-slate-600 flex-shrink-0"
+              aria-label={itriGelExpanded ? (uiLang === 'en' ? 'Collapse' : '收合') : (uiLang === 'en' ? 'Expand' : '展開')}
+            >
+              <ChevronRight size={14} className={`transition-transform ${itriGelExpanded ? 'rotate-90' : ''}`} />
+            </button>
+            <button
+              type="button"
+              onClick={() => select('ITRI|GEL')}
+              className={`flex-1 text-left py-1.5 pr-3 text-sm font-semibold truncate ${value === 'ITRI|GEL' ? 'text-blue-700' : 'text-slate-700'}`}
+            >
+              {L.itriGelLabel}
+            </button>
+          </div>
+          {itriGelExpanded && ITRI_LETTER_ORDER.map(letter => {
+            const letterValue = `ITRI|GEL|${letter}`;
+            const isExpanded = expandedLetters.has(letter);
+            return (
+              <div key={letter}>
+                <div className={`flex items-center gap-1 rounded-md ${value === letterValue ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); toggleLetter(letter); }}
+                    className="p-1 pl-9 text-slate-400 hover:text-slate-600 flex-shrink-0"
+                    aria-label={isExpanded ? (uiLang === 'en' ? 'Collapse' : '收合') : (uiLang === 'en' ? 'Expand' : '展開')}
+                  >
+                    <ChevronRight size={14} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => select(letterValue)}
+                    className={`flex-1 text-left py-1.5 pr-3 text-sm truncate ${value === letterValue ? 'text-blue-700 font-semibold' : 'text-slate-700'}`}
+                  >
+                    {letter}
+                  </button>
+                </div>
+                {isExpanded && ITRI_LETTER_GROUPS[letter].map(code => {
+                  const codeValue = `ITRI|GEL|${letter}|${code}`;
+                  const info = getItriSubgroupInfo(code);
+                  const proxy = ITRI_SUBGROUP_CATEGORY_MAP[code];
+                  const isCombo = proxy && proxy.categories.length > 1;
+                  const codeLabel = `${code} ${uiLang === 'en' ? info.en : info.zh}`;
+                  if (!isCombo) {
+                    return (
+                      <button key={code} type="button" onClick={() => select(codeValue)} className={rowClass(codeValue, 'pl-12')}>
+                        {codeLabel}
+                      </button>
+                    );
+                  }
+                  const codeExpanded = expandedCodes.has(code);
+                  return (
+                    <div key={code}>
+                      <div className={`flex items-center gap-1 rounded-md ${value === codeValue ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleCode(code); }}
+                          className="p-1 pl-12 text-slate-400 hover:text-slate-600 flex-shrink-0"
+                          aria-label={codeExpanded ? (uiLang === 'en' ? 'Collapse' : '收合') : (uiLang === 'en' ? 'Expand' : '展開')}
+                        >
+                          <ChevronRight size={14} className={`transition-transform ${codeExpanded ? 'rotate-90' : ''}`} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => select(codeValue)}
+                          className={`flex-1 text-left py-1.5 pr-3 text-sm truncate ${value === codeValue ? 'text-blue-700 font-semibold' : 'text-slate-700'}`}
+                        >
+                          {codeLabel}
+                        </button>
+                      </div>
+                      {codeExpanded && proxy.categories.map((ref, i) => (
+                        <button
+                          key={ref}
+                          type="button"
+                          onClick={() => select(`${codeValue}|${i}`)}
+                          className={rowClass(`${codeValue}|${i}`, 'pl-16')}
+                        >
+                          {categoryRefLabel(ref)}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 function Dashboard({
-  dataset, rows, isSampleData, appState, onUpload,
-  isCustomUpload, onRestoreDefault,
+  dataset, rows, isSampleData, appState,
   query, setQuery, searchMode, setSearchMode,
   selectedTech, setSelectedTech,
   selectedSector, setSelectedSector,
@@ -3947,7 +4126,15 @@ function Dashboard({
   })();
 
   const searchData = useMemo(() => {
-    if (!query.trim() && !selectedSector && !pathFilter) return { results: [], totalMatches: 0 };
+    // No query, no sector filter, no path filter — "browse everything"
+    // default (both on first load and after resetting to 所有官方分類), not
+    // an empty/prompt state. isDirectHit/isDescHit stay false — no keyword
+    // was typed, and the badge that reads them is hidden whenever there's no
+    // query anyway (see the list rendering below).
+    if (!query.trim() && !selectedSector && !pathFilter) {
+      const results = rows.map(tech => ({ tech, score: 0, isDirectHit: false, isDescHit: false }));
+      return { results, totalMatches: results.length };
+    }
     const lowerQuery = query.trim().toLowerCase();
     // selectedSector is either a bare top-level category ("Hydrogen") or a
     // "TopCategory|SubCategory" pair encoded by the dropdown (see the
@@ -3959,21 +4146,21 @@ function Dashboard({
     // completely different top-level sector).
     const sectorParts = selectedSector ? selectedSector.split('|') : [];
     const lowerSector = sectorParts.length ? sectorParts[sectorParts.length - 1].trim().toLowerCase() : '';
-    // "ITRI|C100" style values pick one of the curated 工研院綠能所 sub-group
-    // -> IEA technology lists instead of a live tech.sector path match — see
-    // ITRI_SUBGROUP_TECH_MAP. Membership is an exact, hand-audited technology
-    // ID list, so (unlike the sector dropdown) there's no fulltext fallback:
-    // a technology either is or isn't in that sub-group's collected list.
+    // "ITRI"-rooted values (技術研究領域分類 > ITRI GEL > <letter> > <code>)
+    // pick a combined or exact curated 工研院綠能所 sub-group -> IEA technology
+    // list instead of a live tech.sector path match — see getItriTechIds.
+    // Membership is an exact, hand-audited technology ID list, so (unlike the
+    // sector dropdown) there's no fulltext fallback: a technology either is
+    // or isn't in the selected node's collected list.
     const isItriFilter = sectorParts[0] === 'ITRI';
-    const itriTechIds = isItriFilter ? (ITRI_SUBGROUP_TECH_MAP[sectorParts[1]]?.techIds || []) : null;
 
     const expandedQueries = lowerQuery ? (SEARCH_ALIASES[lowerQuery] || [lowerQuery]) : [];
 
     let results = rows.map(tech => {
-      let score = 0, isDirectHit = false, isDescHit = false;
+      let score = 0;
       const isSectorMatch = selectedSector
         ? (isItriFilter
-            ? itriTechIds.includes(tech._id)
+            ? itriMatchesTech(sectorParts, tech)
             : Array.isArray(tech.sector) && tech.sector[1] === sectorParts[0] && (sectorParts.length < 2 || tech.sector[2] === sectorParts[1]))
         : true;
       const subjectTexts = [tech.technology_name, tech.technology_name_zh].filter(Boolean).map(s => String(s).toLowerCase());
@@ -3985,41 +4172,47 @@ function Dashboard({
       // is an ordered, exact prefix of tech.sector — deliberately NOT a loose
       // substring match like selectedSector, so clicking "Aluminium" only
       // pulls in technologies actually nested under that same path, not any
-      // technology whose sector text happens to contain "Aluminium".
+      // technology whose sector text happens to contain "Aluminium". This
+      // only feeds the score (for ranking/inclusion) — it's a category
+      // filter, not a keyword hit, so it must not set isDirectHit/isDescHit.
       if (pathFilter && pathFilter.length > 0) {
         const isPathMatch = Array.isArray(tech.sector) && pathFilter.every((seg, i) => tech.sector[i] === seg);
         if (!isPathMatch) passesPathFilter = false;
-        else { score += 1; isDirectHit = true; }
+        else score += 1;
       }
 
       if (searchMode === 'subject') {
-        if (selectedSector) { if (!isSectorMatch) passesSectorFilter = false; else { score += 1; isDirectHit = true; } }
-        if (expandedQueries.length > 0) {
-          let queryHit = false;
-          for (const q of expandedQueries) {
-            for (const text of subjectTexts) { const hits = countOccurrences(text, q); if (hits > 0) { score += hits * 5; queryHit = true; isDirectHit = true; } }
-          }
-          if (!queryHit) passesQueryFilter = false;
-        }
+        if (selectedSector) { if (!isSectorMatch) passesSectorFilter = false; else score += 1; }
       } else if (searchMode === 'fulltext') {
         if (selectedSector) {
-          if (isSectorMatch) { score += 1; isDirectHit = true; }
+          if (isSectorMatch) { score += 1; }
           else if (isItriFilter) {
             passesSectorFilter = false;
           } else {
             let sectorDescHit = false;
-            for (const text of descTexts) { const hits = countOccurrences(text, lowerSector); if (hits > 0) { score += hits; sectorDescHit = true; isDescHit = true; } }
+            for (const text of descTexts) { const hits = countOccurrences(text, lowerSector); if (hits > 0) { score += hits; sectorDescHit = true; } }
             if (!sectorDescHit) passesSectorFilter = false;
           }
         }
-        if (expandedQueries.length > 0) {
-          let queryHit = false;
-          for (const q of expandedQueries) {
-            for (const text of subjectTexts) { const hits = countOccurrences(text, q); if (hits > 0) { score += hits * 5; queryHit = true; isDirectHit = true; } }
+      }
+
+      // isDirectHit/isDescHit drive the "直接相關/描述相關" badge and are kept
+      // strictly to actual keyword-query text matches — independent of
+      // whatever sector/path filter is active — so the badge only ever
+      // reflects "your keyword matched this", never "this passed the
+      // category filter you already picked" (which the UI hides the badge
+      // for entirely, see the list rendering below, since it wouldn't tell
+      // you anything you don't already know).
+      let isDirectHit = false, isDescHit = false;
+      if (expandedQueries.length > 0) {
+        let queryHit = false;
+        for (const q of expandedQueries) {
+          for (const text of subjectTexts) { const hits = countOccurrences(text, q); if (hits > 0) { score += hits * 5; queryHit = true; isDirectHit = true; } }
+          if (searchMode === 'fulltext') {
             for (const text of descTexts) { const hits = countOccurrences(text, q); if (hits > 0) { score += hits; queryHit = true; isDescHit = true; } }
           }
-          if (!queryHit) passesQueryFilter = false;
         }
+        if (!queryHit) passesQueryFilter = false;
       }
 
       if (passesSectorFilter && passesQueryFilter && passesPathFilter && score > 0) return { tech, score, isDirectHit, isDescHit };
@@ -4037,6 +4230,11 @@ function Dashboard({
 
   const totalMatches = searchData.totalMatches;
   const totalPages = Math.max(1, Math.ceil(totalMatches / 20));
+
+  // Note: the "browse everything" default (first load, or resetting the
+  // sector dropdown to 所有官方分類) doesn't need its own effect to select a
+  // first tech — the existing effect below already does that for every
+  // searchData.results change, including this one.
 
   // The subset the Strategy tab actually runs on: the checked technologies
   // (if any of them are among the current matches), otherwise every match.
@@ -4085,6 +4283,38 @@ function Dashboard({
   // the English form) — sectorLeafZhMap membership tells them apart, since
   // it only ever contains genuine sector_en leaves.
   const [lockedSector, setLockedSector] = useState(null);
+
+  // Clicking a donut slice now also drills the left-hand list down to that
+  // category, reusing the same pathFilter mechanism the detail view's
+  // classification-path breadcrumb already uses (see setPathFilter(selectedTech.sector.slice(...))
+  // below) — a slice groups techs by dynamicCategoryFor, which is either the
+  // true leaf (sector_en/zh) when no pathFilter is active yet, or the next
+  // segment past the current pathFilter once already drilled in. Either way,
+  // one representative tech's real tech.sector array up to that depth is a
+  // valid ordered prefix pathFilter already knows how to match. The "其他/
+  // Other" catch-all bucket groups unrelated leftover categories together,
+  // so it's excluded — there's no single coherent path behind it.
+  const handleDonutSegmentClick = (segment) => {
+    setLockedSector(segment);
+    if (!segment) return;
+    const otherLabel = uiLang === 'en' ? 'Other' : '其他';
+    if (segment.label === otherLabel) return;
+    const match = strategyResults.find(r => {
+      const cat = dynamicCategoryFor(r.tech);
+      return (uiLang === 'en' ? cat.en : cat.zh) === segment.label;
+    });
+    if (match && Array.isArray(match.tech.sector)) {
+      // Mirrors dynamicCategoryFor's own branching exactly: it only groups by
+      // "the segment past the current pathFilter" once pathFilter is already
+      // 2+ levels deep — at 0 or 1 levels it still groups by the true leaf
+      // (sector_en/zh), so the filter must go all the way to that tech's
+      // full path in those cases, not just one level past pathFilter.
+      const depth = (pathFilter && pathFilter.length > 1) ? pathFilter.length + 1 : match.tech.sector.length;
+      setPathFilter(match.tech.sector.slice(0, depth));
+      setSelectedSector('');
+      setQuery('');
+    }
+  };
 
   const lockedSectorStats = useMemo(() => {
     if (!lockedSector) return null;
@@ -4327,9 +4557,6 @@ function Dashboard({
                     <CheckCircle2 size={12} /> {L.successBadge(techCount, initiativeCount)}
                   </span>
                 )}
-                {appState.status === 'success' && appState.isRawFormat && (
-                  <span className="bg-white/15 text-white border border-white/20 px-2 py-0.5 rounded text-sm">{L.rawFormatDetected}</span>
-                )}
                 {appState.status === 'error' && (
                   <span className="bg-red-500/20 text-red-200 border border-red-300/40 px-2 py-0.5 rounded text-sm flex items-center gap-1">
                     <AlertCircle size={12} /> {appState.errorMsg}
@@ -4339,7 +4566,7 @@ function Dashboard({
             </div>
           </div>
 
-          {/* Right: dataset-generated-at box + restore-default ("reload") button */}
+          {/* Right: dataset-generated-at box */}
           <div className="flex items-center gap-3 flex-shrink-0">
             <div className="bg-white/15 border border-white/20 rounded-xl px-4 py-2 text-right">
               <div className="text-[11px] uppercase tracking-wider text-blue-100 font-semibold">{L.datasetTimeLabel}</div>
@@ -4348,20 +4575,10 @@ function Dashboard({
                 <div className="text-[10px] text-blue-100/80 mt-0.5 whitespace-nowrap">{L.nextUpdateHint(nextUpdateLabel)}</div>
               )}
             </div>
-            {isCustomUpload && (
-              <button
-                type="button"
-                onClick={onRestoreDefault}
-                title={L.restoreDefaultData}
-                className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/10 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
-              >
-                <RotateCcw size={14} /> {L.restoreDefaultData}
-              </button>
-            )}
           </div>
         </div>
 
-        {/* Secondary row: platform controls (language, AI provider, API key, upload) */}
+        {/* Secondary row: platform controls (language, AI provider, API key) */}
         <div className="mt-3 pt-3 2xl:mt-4 2xl:pt-4 border-t border-white/10 flex flex-wrap items-center gap-3 text-base">
 
           <button
@@ -4414,12 +4631,6 @@ function Dashboard({
               {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
           </div>
-
-          <label className="cursor-pointer bg-white text-blue-800 hover:bg-blue-50 font-medium py-1.5 px-4 rounded-lg transition-colors flex items-center gap-2">
-            <FileJson size={16} />
-            <span>{L.uploadJson}</span>
-            <input type="file" accept=".json" className="hidden" onChange={onUpload} />
-          </label>
         </div>
       </header>
 
@@ -4445,26 +4656,13 @@ function Dashboard({
                     to this dropdown's own (looser) matching instead, so the
                     two controls are never useful to show at the same time. */}
                 {!pathFilter && (
-                  <div className="relative mb-2 2xl:mb-3">
-                    <select value={selectedSector} onChange={e => { setSelectedSector(e.target.value); setPathFilter(null); }} className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base appearance-none bg-white font-medium text-slate-700">
-                      <option value="">{L.allSectors}</option>
-                      {Object.entries(FIXED_SECTORS).map(([sector, subsectors]) => (
-                        <optgroup key={sector} label={`${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}>
-                          <option value={sector}>{uiLang === 'en' ? sector : `全部 ${sector} (${SECTOR_TRANSLATIONS[sector] || ''})`}</option>
-                          {subsectors.map(sub => <option key={sub} value={`${sector}|${sub}`}>↳ {uiLang === 'en' ? sub : `${sub} (${SECTOR_TRANSLATIONS[sub] || ''})`}</option>)}
-                        </optgroup>
-                      ))}
-                      <optgroup label={L.itriGroupLabel}>
-                        {ITRI_SUBGROUP_ORDER.map(code => (
-                          <option key={code} value={`ITRI|${code}`}>
-                            {code} {uiLang === 'en' ? ITRI_SUBGROUP_TECH_MAP[code].en : ITRI_SUBGROUP_TECH_MAP[code].zh}
-                          </option>
-                        ))}
-                      </optgroup>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                      <svg className="fill-current h-4 w-4" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
-                    </div>
+                  <div className="mb-2 2xl:mb-3">
+                    <SectorTreeDropdown
+                      value={selectedSector}
+                      onChange={(val) => { setSelectedSector(val); setPathFilter(null); }}
+                      uiLang={uiLang}
+                      L={L}
+                    />
                   </div>
                 )}
 
@@ -4517,12 +4715,7 @@ function Dashboard({
           </div>
 
           <div ref={listContainerRef} className="flex-1 overflow-y-auto p-2 bg-white">
-            {!query.trim() && !selectedSector && !pathFilter ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400 p-6 text-center">
-                <Search size={32} className="mb-2 opacity-50" />
-                <p>{L.emptyPrompt}</p>
-              </div>
-            ) : totalMatches === 0 ? (
+            {totalMatches === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 p-6 text-center">
                 <AlertCircle size={32} className="mb-2 opacity-50" />
                 <p>{L.noMatch}</p>
@@ -4549,7 +4742,12 @@ function Dashboard({
                         <button onClick={() => { setSelectedTech(tech); setRightPanelTab('detail'); }} className="flex-1 min-w-0 text-left flex flex-col gap-1">
                           <div className="flex justify-between items-start gap-2">
                             <span className="font-semibold text-slate-800 text-base line-clamp-1">{primaryName}</span>
-                            <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${item.isDirectHit ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{item.isDirectHit ? L.directHit : L.descHit}</span>
+                            {/* Only meaningful when a keyword was actually typed — browsing purely
+                                by category/path filter means every visible row "matches" by
+                                definition, so the badge wouldn't tell you anything new. */}
+                            {query.trim() && (
+                              <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${item.isDirectHit ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{item.isDirectHit ? L.directHit : L.descHit}</span>
+                            )}
                           </div>
                           <span className="text-sm text-slate-500 line-clamp-1">{secondaryName || L.unlabeled}</span>
                           <div className="flex justify-between items-center mt-0.5">
@@ -4741,7 +4939,15 @@ function Dashboard({
                         {isCheckedSubsetActive && (
                           <p className="text-sm text-purple-600 bg-purple-50 border border-purple-100 rounded px-2 py-1 mb-4 self-start">{L.checkedSubsetBadge(strategyCount)}</p>
                         )}
-                        <DonutChart segments={sectorDonutData} centerValue={strategyCount} centerLabel={L.sectorDistributionCenterLabel} size={208} strokeWidth={22} onLockChange={setLockedSector} />
+                        <DonutChart
+                          key={pathFilter ? pathFilter.join('>') : 'root'}
+                          segments={sectorDonutData}
+                          centerValue={strategyCount}
+                          centerLabel={L.sectorDistributionCenterLabel}
+                          size={208}
+                          strokeWidth={22}
+                          onLockChange={handleDonutSegmentClick}
+                        />
                         {lockedSectorSummary && (
                           <p className="text-base text-slate-600 leading-relaxed mt-5 pt-4 border-t border-slate-100 self-stretch">
                             {lockedSectorSummary}
