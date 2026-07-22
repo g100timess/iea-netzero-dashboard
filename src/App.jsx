@@ -3143,34 +3143,51 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [searchMode, setSearchMode] = useState('subject');
   const [selectedTech, setSelectedTech] = useState(null);
-  const [selectedSector, setSelectedSector] = useState('');
-  // Set when the user clicks a segment of a technology's full sector-path
-  // breadcrumb (in the detail view) — an array of the *English* sector[]
-  // values up to and including the clicked segment, e.g. ['large-scale or
-  // industrial', 'Industry', 'Aluminium']. Kept separate from selectedSector
-  // (which does a loose substring match against a flattened bag of sector
-  // text) because a path click needs an exact, ordered prefix match against
-  // tech.sector — clicking "Aluminium" must not also pull in an unrelated
-  // "Aluminium" appearing at a different depth under a different top
-  // category. See searchData below for the matching logic.
-  // Browser-history-style undo/redo for pathFilter: history[index] is the
-  // live value; setPathFilter (really navigatePathFilter, below) is every
-  // *new* navigation — donut-slice clicks, breadcrumb clicks, the sector
-  // dropdown clearing it, the "clear path filter" button — and truncates
-  // anything past the current index, same as a browser discarding forward
-  // history once you navigate somewhere new after going back. "Back"/
-  // "forward" only move the index; they don't touch the stack itself.
-  const [pathFilterHistory, setPathFilterHistory] = useState([null]);
-  const [pathFilterIndex, setPathFilterIndex] = useState(0);
-  const pathFilter = pathFilterHistory[pathFilterIndex];
-  const setPathFilter = (value) => {
-    setPathFilterHistory(prev => [...prev.slice(0, pathFilterIndex + 1), value]);
-    setPathFilterIndex(i => i + 1);
+  // selectedSector (loose substring match against a flattened bag of sector
+  // text, driven by the sector dropdown) and pathFilter (an ordered, exact
+  // prefix of tech.sector, set by clicking a breadcrumb segment in the detail
+  // view or a donut slice in the strategy overview — e.g. ['large-scale or
+  // industrial', 'Industry', 'Aluminium']) are tracked together as one
+  // browser-history-style stack, since every action that sets one of them
+  // also resets the other (they're mutually exclusive ways of filtering the
+  // same list — see searchData below for the matching logic). history[index]
+  // is the live combined state; navigateFilter (below) is every *new*
+  // navigation and truncates anything past the current index, same as a
+  // browser discarding forward history once you navigate somewhere new after
+  // going back. "Back"/"forward" only move the index; they don't touch the
+  // stack itself. This is what lets drilling into "Hydrogen > Production" via
+  // the dropdown, then further into a donut slice, then going "back" land you
+  // on "Hydrogen > Production" again — not blow past it straight to
+  // 所有官方分類 — since a single pathFilter-only history couldn't tell that
+  // selectedSector had also changed along the way.
+  const [filterNav, setFilterNav] = useState({ history: [{ selectedSector: '', pathFilter: null }], index: 0 });
+  const { selectedSector, pathFilter } = filterNav.history[filterNav.index];
+  const navigateFilter = (partial) => {
+    setFilterNav(prev => {
+      const current = prev.history[prev.index];
+      const next = { ...current, ...partial };
+      // No-op if nothing actually changed — guards against React StrictMode's
+      // dev-only double-invocation of functional setState updaters (which
+      // would otherwise push two identical entries per click) and simply
+      // avoids a redundant history step if the same state is set twice.
+      if (next.selectedSector === current.selectedSector && JSON.stringify(next.pathFilter) === JSON.stringify(current.pathFilter)) {
+        return prev;
+      }
+      return { history: [...prev.history.slice(0, prev.index + 1), next], index: prev.index + 1 };
+    });
   };
-  const pathFilterBack = () => setPathFilterIndex(i => Math.max(0, i - 1));
-  const pathFilterForward = () => setPathFilterIndex(i => Math.min(pathFilterHistory.length - 1, i + 1));
-  const canPathFilterBack = pathFilterIndex > 0;
-  const canPathFilterForward = pathFilterIndex < pathFilterHistory.length - 1;
+  // setSelectedSector mirrors the sector dropdown's old onChange (pick a
+  // sector, always clear any active path filter) as a single atomic step.
+  const setSelectedSector = (val) => navigateFilter({ selectedSector: val, pathFilter: null });
+  // setPathFilter only touches pathFilter (used by "clear path filter", which
+  // leaves selectedSector as-is — it's already '' by the time a path filter
+  // can be active). Donut-slice clicks and breadcrumb clicks need to change
+  // both at once, so they call navigateFilter directly instead.
+  const setPathFilter = (val) => navigateFilter({ pathFilter: val });
+  const filterNavBack = () => setFilterNav(prev => ({ ...prev, index: Math.max(0, prev.index - 1) }));
+  const filterNavForward = () => setFilterNav(prev => ({ ...prev, index: Math.min(prev.history.length - 1, prev.index + 1) }));
+  const canFilterNavBack = filterNav.index > 0;
+  const canFilterNavForward = filterNav.index < filterNav.history.length - 1;
   // Lifted out of Dashboard so handleJumpToTech (below) can switch back to
   // the "技術詳情" tab when a slide reference is clicked from inside the AI
   // modal — otherwise selectedTech updates invisibly behind whichever tab
@@ -3614,10 +3631,11 @@ export default function App() {
         setSelectedSector={setSelectedSector}
         pathFilter={pathFilter}
         setPathFilter={setPathFilter}
-        onPathFilterBack={pathFilterBack}
-        onPathFilterForward={pathFilterForward}
-        canPathFilterBack={canPathFilterBack}
-        canPathFilterForward={canPathFilterForward}
+        navigateFilter={navigateFilter}
+        onFilterNavBack={filterNavBack}
+        onFilterNavForward={filterNavForward}
+        canFilterNavBack={canFilterNavBack}
+        canFilterNavForward={canFilterNavForward}
         onOpenStrategyOverview={handleOpenStrategyOverview}
         apiKey={apiKey}
         onApiKeyChange={handleApiKeyChange}
@@ -4050,8 +4068,8 @@ function Dashboard({
   query, setQuery, searchMode, setSearchMode,
   selectedTech, setSelectedTech,
   selectedSector, setSelectedSector,
-  pathFilter, setPathFilter,
-  onPathFilterBack, onPathFilterForward, canPathFilterBack, canPathFilterForward,
+  pathFilter, setPathFilter, navigateFilter,
+  onFilterNavBack, onFilterNavForward, canFilterNavBack, canFilterNavForward,
   onOpenStrategyOverview,
   apiKey, onApiKeyChange,
   aiProvider, onProviderChange,
@@ -4336,8 +4354,10 @@ function Dashboard({
       // (sector_en/zh), so the filter must go all the way to that tech's
       // full path in those cases, not just one level past pathFilter.
       const depth = (pathFilter && pathFilter.length > 1) ? pathFilter.length + 1 : match.tech.sector.length;
-      setPathFilter(match.tech.sector.slice(0, depth));
-      setSelectedSector('');
+      // One atomic navigation step (not separate setPathFilter/setSelectedSector
+      // calls) so "back" restores whatever selectedSector was active before
+      // this click, instead of skipping straight past it.
+      navigateFilter({ pathFilter: match.tech.sector.slice(0, depth), selectedSector: '' });
       setQuery('');
     }
   };
@@ -4850,8 +4870,7 @@ function Dashboard({
                                 {i > 0 && <ChevronRight size={14} className="text-slate-300 flex-shrink-0" />}
                                 <button
                                   onClick={() => {
-                                    setPathFilter(selectedTech.sector.slice(0, i + 1));
-                                    setSelectedSector('');
+                                    navigateFilter({ pathFilter: selectedTech.sector.slice(0, i + 1), selectedSector: '' });
                                     setQuery('');
                                   }}
                                   className="text-blue-600 hover:text-blue-800 hover:underline font-medium px-1 py-0.5 rounded transition-colors"
@@ -4974,20 +4993,20 @@ function Dashboard({
                           strokeWidth={22}
                           onLockChange={handleDonutSegmentClick}
                         />
-                        {(canPathFilterBack || canPathFilterForward) && (
+                        {(canFilterNavBack || canFilterNavForward) && (
                           <div className="flex items-center gap-2 mt-5">
-                            {canPathFilterBack && (
+                            {canFilterNavBack && (
                               <button
-                                onClick={onPathFilterBack}
+                                onClick={onFilterNavBack}
                                 title={L.backOneLevel}
                                 className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
                               >
                                 <ChevronLeft size={14} /> {L.backOneLevel}
                               </button>
                             )}
-                            {canPathFilterForward && (
+                            {canFilterNavForward && (
                               <button
-                                onClick={onPathFilterForward}
+                                onClick={onFilterNavForward}
                                 title={L.forwardOneLevel}
                                 className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
                               >
