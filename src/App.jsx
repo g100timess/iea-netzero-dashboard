@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, AlertCircle, ChevronLeft, ChevronRight, Database, FileText, Info, CheckCircle2, Download, Sparkles, X, Loader2, KeyRound, Eye, EyeOff, RotateCcw, Copy, ExternalLink, ChevronDown, ChevronUp, Globe, HelpCircle, Presentation } from 'lucide-react';
+import { Search, AlertCircle, ChevronLeft, ChevronRight, Database, FileText, Info, CheckCircle2, Download, Sparkles, X, Loader2, KeyRound, Eye, EyeOff, RotateCcw, Copy, ExternalLink, ChevronDown, ChevronUp, Globe, HelpCircle, Presentation, Settings } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } from 'docx';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
@@ -1220,6 +1220,7 @@ const APP_LABELS = {
     loadingBadge: '正在讀取 JSON 資料...',
     successBadge: (t, i) => `完整資料已載入：${t} 項技術、${i} 筆案例`,
     aiProviderLabel: 'AI 供應商',
+    mobileControlsToggle: '平台設定（語言／AI 供應商／API 金鑰）',
     apiKeyPlaceholder: (p) => `貼上你的 ${p} API 金鑰`,
     openRouterModelPlaceholder: '模型 ID，例如 openai/gpt-4o-mini',
     hideKey: '隱藏金鑰',
@@ -1255,6 +1256,7 @@ const APP_LABELS = {
     prevPage: '上一頁',
     nextPage: '下一頁',
     detailTab: '技術詳情',
+    backToList: '返回清單',
     strategyTab: '查詢策略總覽',
     selectPrompt: '請從左側列表選取一項技術以檢視詳情',
     fieldSector: (s) => `領域: ${s}`,
@@ -1311,6 +1313,7 @@ const APP_LABELS = {
     loadingBadge: 'Loading JSON data...',
     successBadge: (t, i) => `Data loaded: ${t} technologies, ${i} case records`,
     aiProviderLabel: 'AI Provider',
+    mobileControlsToggle: 'Platform settings (language / AI provider / API key)',
     apiKeyPlaceholder: (p) => `Paste your ${p} API key`,
     openRouterModelPlaceholder: 'Model ID, e.g. openai/gpt-4o-mini',
     hideKey: 'Hide key',
@@ -1346,6 +1349,7 @@ const APP_LABELS = {
     prevPage: 'Previous',
     nextPage: 'Next',
     detailTab: 'Technology Detail',
+    backToList: 'Back to list',
     strategyTab: 'Query Strategy Overview',
     selectPrompt: 'Select a technology from the list on the left to see its details',
     fieldSector: (s) => `Sector: ${s}`,
@@ -3193,6 +3197,12 @@ export default function App() {
   // modal — otherwise selectedTech updates invisibly behind whichever tab
   // the user was already on.
   const [rightPanelTab, setRightPanelTab] = useState('detail');
+  // Mobile-only (below md): the list and the detail/strategy panel used to
+  // always split the screen in half, which felt cramped on a phone. Below md,
+  // exactly one of them is shown full-height at a time — 'list' by default,
+  // 'panel' once a tech is picked or a slide reference is jumped to. md: and
+  // up ignore this and always show both side by side, same as before.
+  const [mobileView, setMobileView] = useState('list');
 
   // AI Modal state
   const [showAIModal, setShowAIModal] = useState(false);
@@ -3298,6 +3308,7 @@ export default function App() {
     if (tech) {
       setSelectedTech(tech);
       setRightPanelTab('detail');
+      setMobileView('panel');
       setShowAIModal(false);
     }
   };
@@ -3645,6 +3656,8 @@ export default function App() {
         onOpenRouterModelChange={handleOpenRouterModelChange}
         rightPanelTab={rightPanelTab}
         setRightPanelTab={setRightPanelTab}
+        mobileView={mobileView}
+        setMobileView={setMobileView}
         uiLang={uiLang}
         setUiLang={setUiLang}
       />
@@ -4075,6 +4088,7 @@ function Dashboard({
   aiProvider, onProviderChange,
   openRouterModel, onOpenRouterModelChange,
   rightPanelTab, setRightPanelTab,
+  mobileView, setMobileView,
   uiLang, setUiLang
 }) {
   const L = APP_LABELS[uiLang];
@@ -4084,6 +4098,11 @@ function Dashboard({
   const isInitialLoading = isSampleData && appState.status === 'loading';
   const [showAllInitiatives, setShowAllInitiatives] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  // Mobile-only: the header's language/AI-provider/API-key row is folded away
+  // by default below the md breakpoint (it ate roughly half the viewport
+  // height on a phone) and toggled open from a compact button next to the
+  // dataset-time box; md: and up ignore this entirely and always show it.
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedArticleKey, setCopiedArticleKey] = useState(null);
   const [showPptGuide, setShowPptGuide] = useState(false);
@@ -4612,7 +4631,7 @@ function Dashboard({
             </div>
           </div>
 
-          {/* Right: dataset-generated-at box */}
+          {/* Right: dataset-generated-at box + mobile-only controls toggle */}
           <div className="flex items-center gap-3 flex-shrink-0">
             <div className="bg-white/15 border border-white/20 rounded-xl px-4 py-2 text-right">
               <div className="text-[11px] uppercase tracking-wider text-blue-100 font-semibold">{L.datasetTimeLabel}</div>
@@ -4621,11 +4640,23 @@ function Dashboard({
                 <div className="text-[10px] text-blue-100/80 mt-0.5 whitespace-nowrap">{L.nextUpdateHint(nextUpdateLabel)}</div>
               )}
             </div>
+            <button
+              type="button"
+              onClick={() => setMobileControlsOpen(v => !v)}
+              title={L.mobileControlsToggle}
+              aria-expanded={mobileControlsOpen}
+              className="md:hidden flex items-center gap-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white p-2.5 rounded-xl transition-colors"
+            >
+              <Settings size={18} />
+              {mobileControlsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
           </div>
         </div>
 
-        {/* Secondary row: platform controls (language, AI provider, API key) */}
-        <div className="mt-3 pt-3 2xl:mt-4 2xl:pt-4 border-t border-white/10 flex flex-wrap items-center gap-3 text-base">
+        {/* Secondary row: platform controls (language, AI provider, API key).
+            Folded away on mobile by default (see mobileControlsOpen) — md:flex
+            overrides that unconditionally, so desktop is untouched. */}
+        <div className={`${mobileControlsOpen ? 'flex' : 'hidden'} md:flex mt-3 pt-3 2xl:mt-4 2xl:pt-4 border-t border-white/10 flex-wrap items-center gap-3 text-base`}>
 
           <button
             type="button"
@@ -4684,8 +4715,10 @@ function Dashboard({
       {isInitialLoading ? <SkeletonMain /> : (
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
 
-        {/* Left panel */}
-        <section className="w-full md:w-[400px] lg:w-[460px] flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-white flex flex-col h-1/2 md:h-full min-h-0">
+        {/* Left panel — below md, full-height and shown only in 'list' mobileView
+            (never split half/half with the right panel anymore); md: and up
+            always shows it at its fixed width alongside the right panel. */}
+        <section className={`${mobileView === 'list' ? 'flex' : 'hidden'} md:flex w-full md:w-[400px] lg:w-[460px] flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-white flex-col h-full min-h-0`}>
           <div className="p-3 2xl:p-4 border-b border-slate-100 bg-slate-50 flex-shrink-0">
             {/* Collapsible search controls — folding these away hands their
                 vertical space to the technology list below, which is where
@@ -4785,7 +4818,7 @@ function Dashboard({
                           onChange={() => toggleTechChecked(tech._id)}
                           className="mt-1 w-4 h-4 accent-purple-600 flex-shrink-0 cursor-pointer"
                         />
-                        <button onClick={() => { setSelectedTech(tech); setRightPanelTab('detail'); }} className="flex-1 min-w-0 text-left flex flex-col gap-1">
+                        <button onClick={() => { setSelectedTech(tech); setRightPanelTab('detail'); setMobileView('panel'); }} className="flex-1 min-w-0 text-left flex flex-col gap-1">
                           <div className="flex justify-between items-start gap-2">
                             <span className="font-semibold text-slate-800 text-base line-clamp-1">{primaryName}</span>
                             {/* Only meaningful when a keyword was actually typed — browsing purely
@@ -4817,14 +4850,25 @@ function Dashboard({
           )}
         </section>
 
-        {/* Right panels */}
-        <section className="flex-1 flex flex-col bg-slate-50 relative overflow-hidden h-1/2 md:h-full min-h-0">
+        {/* Right panels — below md, shown only in 'panel' mobileView (see
+            Left panel above); md: and up always shows it. */}
+        <section className={`${mobileView === 'panel' ? 'flex' : 'hidden'} md:flex flex-1 flex-col bg-slate-50 relative overflow-hidden h-full min-h-0`}>
 
           {/* Tab bar — detail view vs. aggregate query strategy are parallel,
               not nested: the strategy overview acts on the whole result set
               (searchData), same as the export button on the left, not on
-              whichever single technology happens to be selected. */}
-          <div className="flex border-b border-slate-200 bg-white px-4 md:px-6 flex-shrink-0">
+              whichever single technology happens to be selected. The
+              mobile-only "back to list" button lets mobileView return to
+              'list' — md: and up don't need it since both panels are always
+              visible side by side there. */}
+          <div className="flex items-center border-b border-slate-200 bg-white px-2 md:px-6 flex-shrink-0">
+            <button
+              onClick={() => setMobileView('list')}
+              title={L.backToList}
+              className="md:hidden flex items-center gap-1 text-slate-500 hover:text-slate-700 px-2 py-3"
+            >
+              <ChevronLeft size={16} />
+            </button>
             <button
               onClick={() => setRightPanelTab('detail')}
               className={`px-4 py-3 text-base font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${rightPanelTab === 'detail' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
