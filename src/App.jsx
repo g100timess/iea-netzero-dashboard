@@ -1301,7 +1301,7 @@ const APP_LABELS = {
     showOnlyChecked: '只看已勾選',
     showAllResults: '顯示全部',
     changeProvider: '更改',
-    setApiKeyShortcut: '尚未設定 AI 金鑰，點此設定',
+    aiProviderPlaceholder: '請選擇 AI 供應商…',
     collapseSearch: '收合搜尋列',
     expandSearch: '展開搜尋列',
     footerDisclaimer: '免責文字：根據 IEA ETP Clean Energy Technology Guide 快取資料生成，正式引用前請核對原始 IEA 資料。',
@@ -1404,7 +1404,7 @@ const APP_LABELS = {
     showOnlyChecked: 'Checked only',
     showAllResults: 'Show all',
     changeProvider: 'Change',
-    setApiKeyShortcut: 'No AI key set yet — tap to set one',
+    aiProviderPlaceholder: 'Choose an AI provider…',
     collapseSearch: 'Collapse search bar',
     expandSearch: 'Expand search bar',
     footerDisclaimer: 'Disclaimer: generated from cached IEA ETP Clean Energy Technology Guide data — verify against the original IEA source before formal citation.',
@@ -4851,7 +4851,11 @@ function Dashboard({
             {uiLang === 'zh' ? 'EN' : '中文'}
           </button>
 
-          <div className={`${mobileProviderConfirmed ? 'hidden' : 'flex'} md:flex items-center gap-3 flex-wrap`}>
+          {/* Provider select + API key: desktop-only here now — below md
+              this same control lives inline in the 策略總攬 card instead
+              (glass-styled, matching the mobile page's look), since that's
+              where it's actually used and where the mobile design puts it. */}
+          <div className="hidden md:flex items-center gap-3 flex-wrap">
             <select
               value={aiProvider}
               onChange={e => { onProviderChange(e.target.value); setMobileProviderConfirmed(true); }}
@@ -4874,7 +4878,7 @@ function Dashboard({
             )}
           </div>
 
-          <div className={`${mobileProviderConfirmed ? 'flex' : 'hidden'} md:flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-lg pl-3 pr-1.5 py-1.5`}>
+          <div className="hidden md:flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-lg pl-3 pr-1.5 py-1.5">
             <KeyRound size={14} className={apiKey.trim() ? 'text-emerald-400' : 'text-slate-400'} />
             <input
               type={showApiKey ? 'text' : 'password'}
@@ -4893,14 +4897,6 @@ function Dashboard({
             >
               {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
-            <button
-              type="button"
-              onClick={() => setMobileProviderConfirmed(false)}
-              className="md:hidden text-xs font-medium text-slate-300 hover:text-white px-1.5 flex-shrink-0"
-              title={L.changeProvider}
-            >
-              {L.changeProvider}
-            </button>
           </div>
         </div>
       </header>
@@ -4910,7 +4906,7 @@ function Dashboard({
           list -> detail tab -> scroll -> strategy tab -> scroll. md: and up
           never render this; the desktop tab bar below is untouched. */}
       {!isInitialLoading && (
-        <nav className="md:hidden flex-shrink-0 flex gap-2 overflow-x-auto px-3 py-2 bg-white border-b border-slate-200" style={{ scrollbarWidth: 'none' }}>
+        <nav className="md:hidden flex-shrink-0 flex gap-2 overflow-x-auto px-3 py-2.5 bg-white/40 backdrop-blur-md border-b border-white/60" style={{ scrollbarWidth: 'none' }}>
           {[
             ['list', L.quickNavList],
             ['sector', L.quickNavSector],
@@ -4923,7 +4919,7 @@ function Dashboard({
               key={key}
               type="button"
               onClick={() => goToQuickNav(key)}
-              className={`flex-shrink-0 text-sm font-medium px-3 py-1.5 rounded-full border transition-colors ${quickNavActive === key ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              className={`flex-shrink-0 text-sm font-medium px-3 py-1.5 rounded-full border transition-colors ${quickNavActive === key ? 'bg-blue-800 text-white border-blue-800' : 'bg-white/50 text-slate-600 border-white/70 hover:bg-white/70'}`}
             >
               {label}
             </button>
@@ -4941,8 +4937,8 @@ function Dashboard({
             and the matching refs on the blocks further down). md: and up
             always shows it at its fixed width alongside the right panel,
             unchanged from before. */}
-        <section className={`flex w-full md:w-[400px] lg:w-[460px] flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-white flex-col md:h-full md:min-h-0`}>
-          <div className="p-3 2xl:p-4 border-b border-slate-100 bg-slate-50 flex-shrink-0">
+        <section className={`flex w-full md:w-[400px] lg:w-[460px] flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-gradient-to-b from-[#EAF2FB] via-[#D3E3F6] to-[#AFC9EC] md:bg-none md:bg-white flex-col md:h-full md:min-h-0`}>
+          <div className="p-3 2xl:p-4 border-b border-white/50 md:border-slate-100 bg-white/30 md:bg-slate-50 backdrop-blur-md md:backdrop-blur-none flex-shrink-0">
             {/* Collapsible search controls — folding these away hands their
                 vertical space to the technology list below, which is where
                 the checkbox-selection work actually happens. */}
@@ -4970,7 +4966,7 @@ function Dashboard({
 
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type="text" placeholder={L.searchPlaceholder} className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base transition-shadow" value={query} onChange={e => setQuery(e.target.value)} />
+                  <input type="text" placeholder={L.searchPlaceholder} className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-white/70 md:border-slate-300 bg-white/50 md:bg-white backdrop-blur-md md:backdrop-blur-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base transition-shadow" value={query} onChange={e => setQuery(e.target.value)} />
                 </div>
                 <div className="text-xs text-slate-500 mt-2 leading-relaxed">{L.searchHint}</div>
                 {pathFilter && pathFilter.length > 0 && (
@@ -5021,7 +5017,7 @@ function Dashboard({
             </div>
           </div>
 
-          <div ref={listContainerRef} className="flex-1 md:overflow-y-auto p-2 bg-white">
+          <div ref={listContainerRef} className="flex-1 md:overflow-y-auto p-2 md:bg-white">
             {totalMatches === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 p-6 text-center">
                 <AlertCircle size={32} className="mb-2 opacity-50" />
@@ -5039,7 +5035,7 @@ function Dashboard({
                       {/* Checkbox sits beside (not inside) the row button —
                           an input nested in a button is invalid HTML and
                           the two click targets would fight each other. */}
-                      <div className={`w-full flex items-start gap-2 p-2.5 rounded-lg transition-colors ${isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'}`}>
+                      <div className={`w-full flex items-start gap-2 p-2.5 rounded-lg md:rounded-lg mb-1.5 md:mb-0 backdrop-blur-md md:backdrop-blur-none transition-colors ${isSelected ? 'bg-blue-50/80 md:bg-blue-50 border border-blue-200' : 'bg-white/45 md:bg-transparent hover:bg-white/70 md:hover:bg-slate-50 border border-white/60 md:border-transparent'}`}>
                         <input
                           type="checkbox"
                           checked={checkedTechIds.has(tech._id)}
@@ -5128,7 +5124,7 @@ function Dashboard({
                 ) : (
                   <div className="max-w-3xl mx-auto w-full space-y-5 pb-20">
                     {/* Tech header */}
-                    <div className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="bg-white/50 md:bg-white p-5 md:p-6 rounded-xl backdrop-blur-md md:backdrop-blur-none shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200">
                       <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-1">{uiLang === 'en' ? (selectedTech.technology_name || techLabel(selectedTech)) : (selectedTech.technology_name_zh || selectedTech.technology_name || L.unlabeled)}</h2>
                       <p className="text-sm md:text-base text-slate-500 font-mono mb-4">{(uiLang === 'en' ? selectedTech.technology_name_zh : selectedTech.technology_name) || L.unlabeled}</p>
                       <div className="flex flex-wrap gap-2 text-sm font-medium">
@@ -5163,7 +5159,7 @@ function Dashboard({
                     </div>
 
                     {/* Summary */}
-                    <div className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="bg-white/50 md:bg-white p-5 md:p-6 rounded-xl backdrop-blur-md md:backdrop-blur-none shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200">
                       <div className="border-b border-slate-200 pb-4 mb-4">
                         <h3 className="text-xl font-semibold text-slate-800 mb-3">{L.summaryTitle}</h3>
                         <div className="bg-amber-50 text-amber-700 px-3 py-2 rounded text-sm font-medium border border-amber-200 inline-flex items-start gap-1.5">
@@ -5196,7 +5192,7 @@ function Dashboard({
                     </div>
 
                     {/* Initiatives */}
-                    <div className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="bg-white/50 md:bg-white p-5 md:p-6 rounded-xl backdrop-blur-md md:backdrop-blur-none shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200">
                       <div className="flex flex-wrap justify-between items-center mb-4 gap-3">
                         <h3 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
                           <Database size={18} className="text-emerald-500" /> {L.initiativesTitle}
@@ -5254,7 +5250,7 @@ function Dashboard({
                         handleDonutSegmentClick); the "back one level" button
                         below undoes that one step at a time. */}
                     {totalMatches > 0 && (
-                      <div ref={sectorCardRef} className="lg:w-[340px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-blue-500 p-6 md:p-8 flex flex-col items-center">
+                      <div ref={sectorCardRef} className="lg:w-[340px] flex-shrink-0 bg-white/50 md:bg-white backdrop-blur-md md:backdrop-blur-none rounded-2xl shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200 border-t-4 border-t-blue-500 p-6 md:p-8 flex flex-col items-center">
                         <h3 className="text-lg font-bold text-slate-800 mb-1 self-start">{L.sectorDistributionTitle}</h3>
                         <p className="text-xs text-slate-400 mb-5 self-start">{L.sectorDistributionHint}</p>
                         {isCheckedSubsetActive && (
@@ -5304,7 +5300,7 @@ function Dashboard({
                           summary; the option to upgrade to an AI-generated version
                           lives inside that same modal, so this is one progressive
                           entry point rather than two separate, overlapping ones. */}
-                      <div ref={strategyCardRef} className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-purple-500">
+                      <div ref={strategyCardRef} className="bg-white/50 md:bg-white p-6 md:p-8 rounded-2xl backdrop-blur-md md:backdrop-blur-none shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200 border-t-4 border-t-purple-500">
                         <div className="flex items-start gap-4 mb-5">
                           <div className="bg-gradient-to-br from-purple-500 to-blue-500 text-white rounded-xl p-3 flex-shrink-0">
                             <Sparkles size={22} />
@@ -5316,19 +5312,43 @@ function Dashboard({
                             </p>
                           </div>
                         </div>
-                        {/* Mobile-only shortcut to the AI provider/key controls — the
-                            overview button below works without a key (rule-based
-                            summary), but the in-modal "upgrade to AI" step needs one,
-                            so this jumps straight to where it's set instead of making
-                            someone hunt for the header's settings toggle. */}
-                        {!apiKey.trim() && (
-                          <button
-                            onClick={() => { setMobileControlsOpen(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                            className="md:hidden w-full flex items-center gap-1.5 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-100 rounded-lg px-3 py-2 mb-4"
-                          >
-                            <KeyRound size={14} /> {L.setApiKeyShortcut}
-                          </button>
-                        )}
+                        {/* Mobile-only: the actual provider-then-key control lives
+                            here (glass-styled, matching the mobile page), not just a
+                            shortcut back to the header — the overview button below
+                            works without a key (rule-based summary), but the in-modal
+                            "upgrade to AI" step needs one, so it belongs where it's
+                            used. Desktop keeps its own copy in the header, unchanged. */}
+                        <div className="md:hidden mb-4">
+                          {!mobileProviderConfirmed ? (
+                            <select
+                              value=""
+                              onChange={e => { onProviderChange(e.target.value); setMobileProviderConfirmed(true); }}
+                              className="w-full text-sm font-medium text-slate-700 bg-white/55 backdrop-blur-md border border-white/70 rounded-lg px-3 py-2.5 shadow-sm"
+                            >
+                              <option value="" disabled>{L.aiProviderPlaceholder}</option>
+                              {AI_PROVIDER_ORDER.map(p => <option key={p} value={p}>{AI_PROVIDERS[p].label}</option>)}
+                            </select>
+                          ) : (
+                            <div className="flex items-center gap-1.5 bg-white/55 backdrop-blur-md border border-white/70 rounded-lg pl-3 pr-1.5 py-2 shadow-sm">
+                              <KeyRound size={14} className={apiKey.trim() ? 'text-emerald-500' : 'text-slate-400'} />
+                              <input
+                                type={showApiKey ? 'text' : 'password'}
+                                value={apiKey}
+                                onChange={e => onApiKeyChange(e.target.value)}
+                                placeholder={L.apiKeyPlaceholder(AI_PROVIDERS[aiProvider].label)}
+                                className="flex-1 min-w-0 text-sm text-slate-700 placeholder:text-slate-400 bg-transparent focus:outline-none"
+                                autoComplete="off"
+                                spellCheck={false}
+                              />
+                              <button type="button" onClick={() => setShowApiKey(v => !v)} className="text-slate-400 hover:text-slate-600 p-1 rounded transition-colors flex-shrink-0" title={showApiKey ? L.hideKey : L.showKey}>
+                                {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                              <button type="button" onClick={() => setMobileProviderConfirmed(false)} className="text-xs font-medium text-purple-600 hover:text-purple-800 px-1.5 flex-shrink-0">
+                                {L.changeProvider}
+                              </button>
+                            </div>
+                          )}
+                        </div>
                         <button
                           onClick={() => onOpenStrategyOverview({ results: strategyResults, totalMatches: strategyCount })}
                           disabled={strategyCount === 0}
@@ -5344,7 +5364,7 @@ function Dashboard({
                           serve different intents (raw data vs. an external
                           slide-generation workflow), so they're now split
                           into separate cards. */}
-                      <div ref={exportCardRef} className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-emerald-500">
+                      <div ref={exportCardRef} className="bg-white/50 md:bg-white p-6 md:p-8 rounded-2xl backdrop-blur-md md:backdrop-blur-none shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200 border-t-4 border-t-emerald-500">
                         <div className="flex items-start gap-4 mb-5">
                           <div className="bg-emerald-50 text-emerald-600 rounded-xl p-3 flex-shrink-0">
                             <Download size={22} />
@@ -5374,7 +5394,7 @@ function Dashboard({
                           and the three raw actions it walks through sit
                           below as lightweight secondary buttons for anyone
                           who already knows the flow. */}
-                      <div ref={pptCardRef} className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-blue-500">
+                      <div ref={pptCardRef} className="bg-white/50 md:bg-white p-6 md:p-8 rounded-2xl backdrop-blur-md md:backdrop-blur-none shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200 border-t-4 border-t-blue-500">
                         <div className="flex items-start gap-4 mb-5">
                           <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-xl p-3 flex-shrink-0">
                             <Presentation size={22} />
