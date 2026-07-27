@@ -1258,6 +1258,12 @@ const APP_LABELS = {
     detailTab: '技術詳情',
     backToList: '返回清單',
     strategyTab: '查詢策略總覽',
+    quickNavList: '技術清單',
+    quickNavSector: '產業別分布',
+    quickNavDetail: '技術詳情',
+    quickNavStrategy: '策略總攬',
+    quickNavExport: '檔案匯出',
+    quickNavPpt: '簡報製作',
     selectPrompt: '請從左側列表選取一項技術以檢視詳情',
     fieldSector: (s) => `領域: ${s}`,
     fieldTrl: (v) => `TRL: ${v}`,
@@ -1292,6 +1298,10 @@ const APP_LABELS = {
     checkedSubsetBadge: (n) => `已依勾選項目篩選：${n} 項技術`,
     checkedCountBar: (n) => `已勾選 ${n} 項技術（策略總覽將以勾選項目為準）`,
     clearChecked: '清除勾選',
+    showOnlyChecked: '只看已勾選',
+    showAllResults: '顯示全部',
+    changeProvider: '更改',
+    setApiKeyShortcut: '尚未設定 AI 金鑰，點此設定',
     collapseSearch: '收合搜尋列',
     expandSearch: '展開搜尋列',
     footerDisclaimer: '免責文字：根據 IEA ETP Clean Energy Technology Guide 快取資料生成，正式引用前請核對原始 IEA 資料。',
@@ -1351,6 +1361,12 @@ const APP_LABELS = {
     detailTab: 'Technology Detail',
     backToList: 'Back to list',
     strategyTab: 'Query Strategy Overview',
+    quickNavList: 'Tech List',
+    quickNavSector: 'Sector Split',
+    quickNavDetail: 'Tech Detail',
+    quickNavStrategy: 'Strategy',
+    quickNavExport: 'Export',
+    quickNavPpt: 'Slides',
     selectPrompt: 'Select a technology from the list on the left to see its details',
     fieldSector: (s) => `Sector: ${s}`,
     fieldTrl: (v) => `TRL: ${v}`,
@@ -1385,6 +1401,10 @@ const APP_LABELS = {
     checkedSubsetBadge: (n) => `Filtered to your checked selection: ${n} technologies`,
     checkedCountBar: (n) => `${n} technologies checked (the strategy overview will use only these)`,
     clearChecked: 'Clear selection',
+    showOnlyChecked: 'Checked only',
+    showAllResults: 'Show all',
+    changeProvider: 'Change',
+    setApiKeyShortcut: 'No AI key set yet — tap to set one',
     collapseSearch: 'Collapse search bar',
     expandSearch: 'Expand search bar',
     footerDisclaimer: 'Disclaimer: generated from cached IEA ETP Clean Energy Technology Guide data — verify against the original IEA source before formal citation.',
@@ -4074,6 +4094,119 @@ function SectorTreeDropdown({ value, onChange, uiLang, L }) {
   );
 }
 
+// ─── Mobile splash screen ────────────────────────────────────────────────────
+// Mobile-only (md:hidden) entry screen shown once per page load: a real
+// rooftop-solar photo up top flowing into a dark "energy core" scene (sun,
+// wind turbine, sea) below, tapped once to reveal the actual dashboard.
+// Purely decorative/onboarding — carries no app state of its own beyond the
+// fade-out, so it lives as its own component rather than inside Dashboard's
+// already-large body.
+function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
+  const [closing, setClosing] = useState(false);
+  const isEn = uiLang === 'en';
+
+  const handleEnter = () => {
+    setClosing(true);
+    setTimeout(onEnter, 300);
+  };
+
+  return (
+    <div className={`md:hidden fixed inset-0 z-[100] bg-[#0E2E52] transition-opacity duration-300 ${closing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+      <button
+        type="button"
+        onClick={handleEnter}
+        className="w-full h-full flex flex-col text-left"
+        aria-label={isEn ? 'Tap to enter the dashboard' : '輕觸進入儀表板'}
+      >
+        {/* Real rooftop-solar photo, cropped tighter on the house itself */}
+        <div className="relative flex-none h-[34vh] min-h-[190px] max-h-[300px] overflow-hidden">
+          <div
+            className="absolute inset-0 bg-cover"
+            style={{
+              backgroundImage: "url('./picture/Solar%20Panels%20and%20Renewable%20Energy%20System%20for%20Sustainable%20Living.jpg')",
+              backgroundPosition: 'center 42%',
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#0E2E52]" />
+          <div className="absolute top-5 left-5 flex items-center gap-2">
+            <span className="w-4 h-4 rounded-full border border-white/90" />
+            <span className="text-[11px] tracking-[0.2em] text-white font-medium">IEA · NET ZERO</span>
+          </div>
+        </div>
+
+        {/* Wave divider — pulled up over the seam so it reads as one curved edge */}
+        <svg className="relative -mt-6 z-10 w-full h-8 flex-none" viewBox="0 0 300 64" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0,36 C70,6 110,60 170,32 C220,10 260,42 300,22 L300,64 L0,64 Z" fill="#0E2E52" />
+        </svg>
+
+        {/* Energy-core scene: open glow (no card frame), sun, turbine, sea */}
+        <div className="relative flex-1 min-h-0 flex flex-col items-center px-6 pt-1">
+          <h2
+            className="text-center font-bold text-xl leading-snug"
+            style={{ backgroundImage: 'linear-gradient(90deg,#FFFFFF,#CDEFF6)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}
+          >
+            {isEn ? <>IEA Net-Zero Tech<br />Intelligence Platform</> : <>IEA 淨零技術<br />智慧分析平台</>}
+          </h2>
+          <span className="mt-2 flex-none w-9 h-[3px] rounded-full" style={{ background: 'linear-gradient(90deg,#4FD9E8,#F5A860)' }} />
+
+          <div className="relative flex-1 w-full max-w-xs mt-2 min-h-0">
+            <div
+              className="absolute left-1/2 top-0 w-40 h-40 rounded-full animate-glow-breathe"
+              style={{ background: 'radial-gradient(circle, rgba(79,217,232,0.32) 0%, rgba(79,217,232,0.12) 45%, rgba(79,217,232,0) 72%)' }}
+            />
+            <div
+              className="absolute left-1/2 top-3 w-14 h-14 rounded-full animate-sun-breathe"
+              style={{ background: '#F5A860', boxShadow: '0 0 34px 10px rgba(245,168,96,0.55)' }}
+            />
+            <WindTurbineIcon className="absolute right-3 top-0 w-9 h-32" duration="6s" />
+            <svg className="absolute bottom-0 left-0 w-full h-24" viewBox="0 0 300 96" preserveAspectRatio="none" aria-hidden="true">
+              <rect x="0" y="30" width="300" height="66" fill="#154B5C" />
+              <path className="animate-wave-drift" d="M-60,26 Q0,8 60,26 T180,26 T300,26 T420,26 V96 H-60 Z" fill="#1D6E7C" />
+              <path className="animate-wave-drift-rev" d="M-60,40 Q0,26 60,40 T180,40 T300,40 T420,40 V96 H-60 Z" fill="#28899A" opacity="0.6" />
+              <g className="animate-fish-swim" style={{ transformOrigin: '66px 60px' }}>
+                <ellipse cx="66" cy="60" rx="10" ry="5" fill="#EAF7FA" opacity="0.85" />
+                <polygon points="56,60 48,55 48,65" fill="#EAF7FA" opacity="0.85" />
+              </g>
+              <g className="animate-fish-swim-rev" style={{ transformOrigin: '220px 76px' }}>
+                <ellipse cx="220" cy="76" rx="8" ry="4" fill="#4FD9E8" opacity="0.8" />
+                <polygon points="212,76 205,72 205,80" fill="#4FD9E8" opacity="0.8" />
+              </g>
+              <g className="animate-jelly-drift" style={{ transformOrigin: '150px 54px' }}>
+                <path d="M140,50 Q150,38 160,50 Q160,58 150,58 Q140,58 140,50 Z" fill="#EAF7FA" opacity="0.55" />
+                <line x1="144" y1="58" x2="143" y2="70" stroke="#EAF7FA" strokeWidth="1.4" opacity="0.5" />
+                <line x1="150" y1="58" x2="150" y2="72" stroke="#EAF7FA" strokeWidth="1.4" opacity="0.5" />
+                <line x1="156" y1="58" x2="157" y2="70" stroke="#EAF7FA" strokeWidth="1.4" opacity="0.5" />
+              </g>
+            </svg>
+            <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-left" style={{ bottom: '64px', left: '22%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
+            <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-mid" style={{ bottom: '58px', left: '50%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
+            <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-right" style={{ bottom: '64px', right: '18%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
+          </div>
+
+          <div className="flex-none flex items-center gap-8 pb-2">
+            <div className="text-center">
+              <div className="text-lg font-semibold text-white font-mono tabular-nums">{techCount}</div>
+              <div className="text-[10px] text-[#8FB4C0] mt-0.5">{isEn ? 'Technologies' : '項技術'}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold text-white font-mono tabular-nums">{initiativeCount}</div>
+              <div className="text-[10px] text-[#8FB4C0] mt-0.5">{isEn ? 'Cases' : '個案例'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA band — a gradient bar instead of a boxed button, blending with the sea above it */}
+        <div
+          className="flex-none flex items-center justify-center pb-6 pt-6"
+          style={{ background: 'linear-gradient(180deg, rgba(29,110,124,0) 0%, rgba(20,68,86,0.85) 45%, #0E2E52 100%)' }}
+        >
+          <span className="text-white text-sm font-semibold tracking-wide">{isEn ? 'Start exploring →' : '開始探索 →'}</span>
+        </div>
+      </button>
+    </div>
+  );
+}
+
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 function Dashboard({
@@ -4103,6 +4236,37 @@ function Dashboard({
   // height on a phone) and toggled open from a compact button next to the
   // dataset-time box; md: and up ignore this entirely and always show it.
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
+  // Mobile-only entry screen (see MobileSplash above) — shown once per page
+  // load, dismissed by tapping it. md: and up never render it regardless of
+  // this state (MobileSplash itself is md:hidden), so desktop is unaffected.
+  const [showMobileSplash, setShowMobileSplash] = useState(true);
+  // Mobile-only quick-nav bar (md:hidden) — below md, list/detail/strategy
+  // no longer toggle in and out of view; they're all stacked in one
+  // continuously scrollable page (see <main>'s className), and these six
+  // buttons just scroll to the relevant spot in it. md: and up still use
+  // rightPanelTab to show exactly one of detail/strategy at a time, same as
+  // before this mobile change — the refs below just also give the mobile
+  // page something to scroll to.
+  const [quickNavActive, setQuickNavActive] = useState('list');
+  const mainScrollRef = useRef(null);
+  const detailTopRef = useRef(null);
+  const sectorCardRef = useRef(null);
+  const strategyCardRef = useRef(null);
+  const exportCardRef = useRef(null);
+  const pptCardRef = useRef(null);
+  const quickNavRefs = { detail: detailTopRef, sector: sectorCardRef, strategy: strategyCardRef, export: exportCardRef, ppt: pptCardRef };
+
+  const goToQuickNav = (key) => {
+    setQuickNavActive(key);
+    if (key === 'list') {
+      mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    // Desktop keeps working exactly as before: whichever of detail/strategy
+    // is being jumped to also becomes the visible tab there.
+    setRightPanelTab(key === 'detail' ? 'detail' : 'strategy');
+    quickNavRefs[key]?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedArticleKey, setCopiedArticleKey] = useState(null);
   const [showPptGuide, setShowPptGuide] = useState(false);
@@ -4113,6 +4277,17 @@ function Dashboard({
   // checked, the Strategy tab (overview modal, donut, exports) runs on just
   // the checked subset instead of every matched result.
   const [checkedTechIds, setCheckedTechIds] = useState(() => new Set());
+  // Lets the list show just the checked subset instead of the full filtered
+  // result set — mainly useful on mobile where "what exactly did I check?"
+  // isn't visible at a glance the way it is on a wide desktop list.
+  const [showOnlyChecked, setShowOnlyChecked] = useState(false);
+  // Mobile-only: the provider <select> and the API-key input never show at
+  // the same time below md (there isn't room, and picking a provider then
+  // immediately being handed its key field reads as one step, not two
+  // unrelated controls) — starts "confirmed" if a key is already saved so a
+  // returning user isn't forced to re-pick their provider every visit. md:
+  // and up ignore this entirely and always show both together, unchanged.
+  const [mobileProviderConfirmed, setMobileProviderConfirmed] = useState(() => !!apiKey.trim());
   const listContainerRef = useRef(null);
   const copyResetTimerRef = useRef(null);
 
@@ -4573,6 +4748,15 @@ function Dashboard({
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col font-sans overflow-hidden">
+      {showMobileSplash && (
+        <MobileSplash
+          onEnter={() => setShowMobileSplash(false)}
+          uiLang={uiLang}
+          techCount={techCount}
+          initiativeCount={initiativeCount}
+        />
+      )}
+
       {/* Header — vibrant blue gradient with a decorative, on-theme
           animated background (slow-spinning wind turbines + a scrolling
           wave strip) instead of generic tech particle effects, since this
@@ -4667,28 +4851,30 @@ function Dashboard({
             {uiLang === 'zh' ? 'EN' : '中文'}
           </button>
 
-          <select
-            value={aiProvider}
-            onChange={e => onProviderChange(e.target.value)}
-            title={L.aiProviderLabel}
-            className="text-sm font-medium px-2 py-1.5 rounded-lg border border-white/20 text-slate-100 bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-300"
-          >
-            {AI_PROVIDER_ORDER.map(p => <option key={p} value={p} className="text-slate-800">{AI_PROVIDERS[p].label}</option>)}
-          </select>
+          <div className={`${mobileProviderConfirmed ? 'hidden' : 'flex'} md:flex items-center gap-3 flex-wrap`}>
+            <select
+              value={aiProvider}
+              onChange={e => { onProviderChange(e.target.value); setMobileProviderConfirmed(true); }}
+              title={L.aiProviderLabel}
+              className="text-sm font-medium px-2 py-1.5 rounded-lg border border-white/20 text-slate-100 bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              {AI_PROVIDER_ORDER.map(p => <option key={p} value={p} className="text-slate-800">{AI_PROVIDERS[p].label}</option>)}
+            </select>
 
-          {aiProvider === 'openrouter' && (
-            <input
-              type="text"
-              value={openRouterModel}
-              onChange={e => onOpenRouterModelChange(e.target.value)}
-              placeholder={L.openRouterModelPlaceholder}
-              className="text-sm text-slate-100 placeholder:text-slate-400 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300 w-44"
-              autoComplete="off"
-              spellCheck={false}
-            />
-          )}
+            {aiProvider === 'openrouter' && (
+              <input
+                type="text"
+                value={openRouterModel}
+                onChange={e => onOpenRouterModelChange(e.target.value)}
+                placeholder={L.openRouterModelPlaceholder}
+                className="text-sm text-slate-100 placeholder:text-slate-400 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300 w-44"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            )}
+          </div>
 
-          <div className="flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-lg pl-3 pr-1.5 py-1.5">
+          <div className={`${mobileProviderConfirmed ? 'flex' : 'hidden'} md:flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-lg pl-3 pr-1.5 py-1.5`}>
             <KeyRound size={14} className={apiKey.trim() ? 'text-emerald-400' : 'text-slate-400'} />
             <input
               type={showApiKey ? 'text' : 'password'}
@@ -4707,18 +4893,55 @@ function Dashboard({
             >
               {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
+            <button
+              type="button"
+              onClick={() => setMobileProviderConfirmed(false)}
+              className="md:hidden text-xs font-medium text-slate-300 hover:text-white px-1.5 flex-shrink-0"
+              title={L.changeProvider}
+            >
+              {L.changeProvider}
+            </button>
           </div>
         </div>
       </header>
 
+      {/* Mobile-only quick-nav — six buttons jumping straight to a section
+          of the existing list/detail/strategy content instead of requiring
+          list -> detail tab -> scroll -> strategy tab -> scroll. md: and up
+          never render this; the desktop tab bar below is untouched. */}
+      {!isInitialLoading && (
+        <nav className="md:hidden flex-shrink-0 flex gap-2 overflow-x-auto px-3 py-2 bg-white border-b border-slate-200" style={{ scrollbarWidth: 'none' }}>
+          {[
+            ['list', L.quickNavList],
+            ['sector', L.quickNavSector],
+            ['detail', L.quickNavDetail],
+            ['strategy', L.quickNavStrategy],
+            ['export', L.quickNavExport],
+            ['ppt', L.quickNavPpt],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => goToQuickNav(key)}
+              className={`flex-shrink-0 text-sm font-medium px-3 py-1.5 rounded-full border transition-colors ${quickNavActive === key ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
+
       {/* Main layout */}
       {isInitialLoading ? <SkeletonMain /> : (
-      <main className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+      <main ref={mainScrollRef} className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden min-h-0">
 
-        {/* Left panel — below md, full-height and shown only in 'list' mobileView
-            (never split half/half with the right panel anymore); md: and up
-            always shows it at its fixed width alongside the right panel. */}
-        <section className={`${mobileView === 'list' ? 'flex' : 'hidden'} md:flex w-full md:w-[400px] lg:w-[460px] flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-white flex-col h-full min-h-0`}>
+        {/* Left panel — below md, this is just the first block of one
+            continuously scrollable mobile page (list, then detail, then the
+            strategy cards, one after another — see the quick-nav bar above
+            and the matching refs on the blocks further down). md: and up
+            always shows it at its fixed width alongside the right panel,
+            unchanged from before. */}
+        <section className={`flex w-full md:w-[400px] lg:w-[460px] flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-white flex-col md:h-full md:min-h-0`}>
           <div className="p-3 2xl:p-4 border-b border-slate-100 bg-slate-50 flex-shrink-0">
             {/* Collapsible search controls — folding these away hands their
                 vertical space to the technology list below, which is where
@@ -4776,11 +4999,16 @@ function Dashboard({
                 </button>
               </div>
               {checkedMatchCount > 0 && (
-                <div className="flex items-center justify-between gap-2 bg-purple-50 border border-purple-100 rounded px-2 py-1.5">
+                <div className="flex items-center justify-between gap-2 bg-purple-50 border border-purple-100 rounded px-2 py-1.5 flex-wrap">
                   <span className="text-xs text-purple-700 font-medium">{L.checkedCountBar(checkedMatchCount)}</span>
-                  <button onClick={() => setCheckedTechIds(new Set())} className="text-xs font-medium text-purple-600 hover:text-purple-800 underline flex-shrink-0">
-                    {L.clearChecked}
-                  </button>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={() => setShowOnlyChecked(v => !v)} className={`text-xs font-medium px-2 py-1 rounded border transition-colors ${showOnlyChecked ? 'bg-purple-600 text-white border-purple-600' : 'text-purple-600 border-purple-200 hover:bg-purple-100'}`}>
+                      {showOnlyChecked ? L.showAllResults : L.showOnlyChecked}
+                    </button>
+                    <button onClick={() => { setCheckedTechIds(new Set()); setShowOnlyChecked(false); }} className="text-xs font-medium text-purple-600 hover:text-purple-800 underline">
+                      {L.clearChecked}
+                    </button>
+                  </div>
                 </div>
               )}
               {selectedTech && (
@@ -4793,7 +5021,7 @@ function Dashboard({
             </div>
           </div>
 
-          <div ref={listContainerRef} className="flex-1 overflow-y-auto p-2 bg-white">
+          <div ref={listContainerRef} className="flex-1 md:overflow-y-auto p-2 bg-white">
             {totalMatches === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 p-6 text-center">
                 <AlertCircle size={32} className="mb-2 opacity-50" />
@@ -4801,7 +5029,7 @@ function Dashboard({
               </div>
             ) : (
               <ul className="space-y-1">
-                {paginatedResults.map((item, idx) => {
+                {(showOnlyChecked ? searchData.results.filter(r => checkedTechIds.has(r.tech._id)) : paginatedResults).map((item, idx) => {
                   const tech = item.tech;
                   const isSelected = selectedTech === tech;
                   const primaryName = uiLang === 'en' ? (tech.technology_name || techLabel(tech)) : (tech.technology_name_zh || tech.technology_name || L.unlabeled);
@@ -4818,7 +5046,20 @@ function Dashboard({
                           onChange={() => toggleTechChecked(tech._id)}
                           className="mt-1 w-4 h-4 accent-purple-600 flex-shrink-0 cursor-pointer"
                         />
-                        <button onClick={() => { setSelectedTech(tech); setRightPanelTab('detail'); setMobileView('panel'); }} className="flex-1 min-w-0 text-left flex flex-col gap-1">
+                        <button
+                          onClick={() => {
+                            setSelectedTech(tech);
+                            setRightPanelTab('detail');
+                            setMobileView('panel');
+                            setQuickNavActive('detail');
+                            // Below md the detail block sits further down the same
+                            // scrollable page (see <main>) rather than behind a
+                            // separate 'panel' view, so jump to it directly instead
+                            // of leaving the user to scroll past the whole list.
+                            detailTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }}
+                          className="flex-1 min-w-0 text-left flex flex-col gap-1"
+                        >
                           <div className="flex justify-between items-start gap-2">
                             <span className="font-semibold text-slate-800 text-base line-clamp-1">{primaryName}</span>
                             {/* Only meaningful when a keyword was actually typed — browsing purely
@@ -4842,7 +5083,7 @@ function Dashboard({
             )}
           </div>
 
-          {totalMatches > 0 && (
+          {totalMatches > 0 && !showOnlyChecked && (
             <div className="p-3 border-t border-slate-200 bg-white flex justify-between items-center flex-shrink-0">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="text-sm font-medium px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors flex items-center gap-1"><ChevronLeft size={14} />{L.prevPage}</button>
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="text-sm font-medium px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors flex items-center gap-1">{L.nextPage}<ChevronRight size={14} /></button>
@@ -4850,25 +5091,19 @@ function Dashboard({
           )}
         </section>
 
-        {/* Right panels — below md, shown only in 'panel' mobileView (see
-            Left panel above); md: and up always shows it. */}
-        <section className={`${mobileView === 'panel' ? 'flex' : 'hidden'} md:flex flex-1 flex-col bg-slate-50 relative overflow-hidden h-full min-h-0`}>
+        {/* Right side — below md, this is the rest of the same continuous
+            scroll page as the list above it (detail block, then the
+            strategy cards, one after another — see detailTopRef/
+            sectorCardRef/etc.). md: and up keep the original tab-switched
+            behavior: rightPanelTab picks exactly one of detail/strategy to
+            show, side by side with the list, unchanged from before. */}
+        <section className={`flex flex-col bg-gradient-to-b from-[#EAF2FB] via-[#D3E3F6] to-[#AFC9EC] md:bg-none md:bg-slate-50 relative md:overflow-hidden md:flex-1 md:h-full md:min-h-0`}>
 
-          {/* Tab bar — detail view vs. aggregate query strategy are parallel,
-              not nested: the strategy overview acts on the whole result set
-              (searchData), same as the export button on the left, not on
-              whichever single technology happens to be selected. The
-              mobile-only "back to list" button lets mobileView return to
-              'list' — md: and up don't need it since both panels are always
-              visible side by side there. */}
-          <div className="flex items-center border-b border-slate-200 bg-white px-2 md:px-6 flex-shrink-0">
-            <button
-              onClick={() => setMobileView('list')}
-              title={L.backToList}
-              className="md:hidden flex items-center gap-1 text-slate-500 hover:text-slate-700 px-2 py-3"
-            >
-              <ChevronLeft size={16} />
-            </button>
+          {/* Tab bar — desktop-only now (md:flex); below md, detail and
+              strategy content are both always in the page (no tab to
+              switch), so this bar and its "which tab" semantics don't apply
+              there and would just be confusing chrome above the list. */}
+          <div className="hidden md:flex items-center border-b border-slate-200 bg-white px-2 md:px-6 flex-shrink-0">
             <button
               onClick={() => setRightPanelTab('detail')}
               className={`px-4 py-3 text-base font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${rightPanelTab === 'detail' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
@@ -4883,9 +5118,8 @@ function Dashboard({
             </button>
           </div>
 
-          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-            {rightPanelTab === 'detail' && (
-              <div className="flex-1 flex flex-col overflow-y-auto p-4 md:p-6 w-full">
+          <div className="flex flex-col lg:flex-row md:overflow-hidden md:min-h-0 md:flex-1">
+            <div ref={detailTopRef} className={`flex flex-col md:overflow-y-auto p-4 md:p-6 w-full ${rightPanelTab !== 'detail' ? 'md:hidden' : ''}`}>
                 {!selectedTech ? (
                   <div className="m-auto text-center text-slate-400">
                     <FileText size={48} className="mx-auto mb-4 opacity-50" />
@@ -5003,10 +5237,8 @@ function Dashboard({
                   </div>
                 )}
               </div>
-            )}
 
-            {rightPanelTab === 'strategy' && (
-              <div className="flex-1 flex flex-col overflow-y-auto p-4 md:p-8 w-full">
+            <div className={`flex flex-col md:overflow-y-auto p-4 md:p-8 w-full ${rightPanelTab !== 'strategy' ? 'md:hidden' : ''}`}>
                 <div className="max-w-6xl mx-auto w-full">
                   <div className="mb-6">
                     <h2 className="text-xl font-bold text-slate-800">{L.strategyTitle}</h2>
@@ -5022,7 +5254,7 @@ function Dashboard({
                         handleDonutSegmentClick); the "back one level" button
                         below undoes that one step at a time. */}
                     {totalMatches > 0 && (
-                      <div className="lg:w-[340px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-blue-500 p-6 md:p-8 flex flex-col items-center">
+                      <div ref={sectorCardRef} className="lg:w-[340px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-blue-500 p-6 md:p-8 flex flex-col items-center">
                         <h3 className="text-lg font-bold text-slate-800 mb-1 self-start">{L.sectorDistributionTitle}</h3>
                         <p className="text-xs text-slate-400 mb-5 self-start">{L.sectorDistributionHint}</p>
                         {isCheckedSubsetActive && (
@@ -5072,7 +5304,7 @@ function Dashboard({
                           summary; the option to upgrade to an AI-generated version
                           lives inside that same modal, so this is one progressive
                           entry point rather than two separate, overlapping ones. */}
-                      <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-purple-500">
+                      <div ref={strategyCardRef} className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-purple-500">
                         <div className="flex items-start gap-4 mb-5">
                           <div className="bg-gradient-to-br from-purple-500 to-blue-500 text-white rounded-xl p-3 flex-shrink-0">
                             <Sparkles size={22} />
@@ -5084,6 +5316,19 @@ function Dashboard({
                             </p>
                           </div>
                         </div>
+                        {/* Mobile-only shortcut to the AI provider/key controls — the
+                            overview button below works without a key (rule-based
+                            summary), but the in-modal "upgrade to AI" step needs one,
+                            so this jumps straight to where it's set instead of making
+                            someone hunt for the header's settings toggle. */}
+                        {!apiKey.trim() && (
+                          <button
+                            onClick={() => { setMobileControlsOpen(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                            className="md:hidden w-full flex items-center gap-1.5 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-100 rounded-lg px-3 py-2 mb-4"
+                          >
+                            <KeyRound size={14} /> {L.setApiKeyShortcut}
+                          </button>
+                        )}
                         <button
                           onClick={() => onOpenStrategyOverview({ results: strategyResults, totalMatches: strategyCount })}
                           disabled={strategyCount === 0}
@@ -5099,7 +5344,7 @@ function Dashboard({
                           serve different intents (raw data vs. an external
                           slide-generation workflow), so they're now split
                           into separate cards. */}
-                      <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-emerald-500">
+                      <div ref={exportCardRef} className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-emerald-500">
                         <div className="flex items-start gap-4 mb-5">
                           <div className="bg-emerald-50 text-emerald-600 rounded-xl p-3 flex-shrink-0">
                             <Download size={22} />
@@ -5129,7 +5374,7 @@ function Dashboard({
                           and the three raw actions it walks through sit
                           below as lightweight secondary buttons for anyone
                           who already knows the flow. */}
-                      <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-blue-500">
+                      <div ref={pptCardRef} className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-blue-500">
                         <div className="flex items-start gap-4 mb-5">
                           <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-xl p-3 flex-shrink-0">
                             <Presentation size={22} />
@@ -5182,7 +5427,6 @@ function Dashboard({
                   <p className="text-xs text-slate-400 text-center leading-relaxed mt-8">{L.footerDisclaimer}</p>
                 </div>
               </div>
-            )}
           </div>
         </section>
       </main>

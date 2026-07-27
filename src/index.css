@@ -32,3 +32,52 @@
 .animate-den-work {
   animation: den-work 1.4s ease-in-out infinite;
 }
+
+/* Mobile splash screen (see MobileSplash in App.jsx) — the "energy core"
+   scene: an ambient glow breathing behind the sun, the sun itself pulsing,
+   two wave layers drifting past each other, small sea-life bobbing/swimming,
+   and three light specks rising from the sun/turbine/wave toward the title
+   (data "flowing in" from each energy source). */
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.75; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+}
+.animate-glow-breathe { animation: glow-breathe 4.5s ease-in-out infinite; }
+
+@keyframes sun-breathe {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.09); }
+}
+.animate-sun-breathe { animation: sun-breathe 3.2s ease-in-out infinite; }
+
+@keyframes wave-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-24px); }
+}
+.animate-wave-drift { animation: wave-drift 3.6s ease-in-out infinite alternate; }
+.animate-wave-drift-rev { animation: wave-drift 4.8s ease-in-out infinite alternate-reverse; }
+
+@keyframes fish-swim {
+  0%, 100% { transform: translateX(0) scaleX(1); }
+  48% { transform: translateX(18px) scaleX(1); }
+  50% { transform: translateX(18px) scaleX(-1); }
+  98% { transform: translateX(0) scaleX(-1); }
+}
+.animate-fish-swim { animation: fish-swim 4s ease-in-out infinite; transform-box: fill-box; }
+.animate-fish-swim-rev { animation: fish-swim 5.2s ease-in-out infinite reverse; transform-box: fill-box; }
+
+@keyframes jelly-drift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.animate-jelly-drift { animation: jelly-drift 3.4s ease-in-out infinite; transform-box: fill-box; }
+
+@keyframes spark-rise {
+  0% { opacity: 0; transform: translate(0, 0); }
+  15% { opacity: 1; }
+  90% { opacity: 0; }
+  100% { opacity: 0; transform: translate(var(--spark-dx, 0), -160px); }
+}
+.animate-spark-rise-left { animation: spark-rise 3s ease-out infinite; --spark-dx: 30px; }
+.animate-spark-rise-mid { animation: spark-rise 3s ease-out infinite 1s; --spark-dx: 0px; }
+.animate-spark-rise-right { animation: spark-rise 3s ease-out infinite 2s; --spark-dx: -30px; }
