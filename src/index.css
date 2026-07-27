@@ -81,3 +81,22 @@
 .animate-spark-rise-left { animation: spark-rise 3s ease-out infinite; --spark-dx: 30px; }
 .animate-spark-rise-mid { animation: spark-rise 3s ease-out infinite 1s; --spark-dx: 0px; }
 .animate-spark-rise-right { animation: spark-rise 3s ease-out infinite 2s; --spark-dx: -30px; }
+
+/* Compatibility fallback for the mobile "glass" surfaces (Dashboard's
+   quick-nav pills, search box, tech-list rows, and the sector/detail/
+   strategy/export/ppt cards) — all of them pair a translucent
+   bg-white/NN with backdrop-blur-md. backdrop-filter itself is supported
+   and auto-prefixed (-webkit-backdrop-filter) by Tailwind for
+   Safari/Chrome/Firefox from roughly 2019-2023 onward, but on a browser
+   that lacks it entirely the blur simply doesn't render, leaving a
+   washed-out, low-contrast card. This bumps just the background opacity
+   (not a redesign) on that fallback path only, purely a readability
+   safety net — @supports still lets the intended translucent+blur look
+   through everywhere it's actually supported. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [class*="bg-white/3"],
+  [class*="bg-white/4"],
+  [class*="bg-white/5"] {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+  }
+}

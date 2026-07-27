@@ -1302,6 +1302,10 @@ const APP_LABELS = {
     showAllResults: '顯示全部',
     changeProvider: '更改',
     aiProviderPlaceholder: '請選擇 AI 供應商…',
+    expandFullList: '展開完整清單／已勾選項目',
+    closeModal: '關閉',
+    allResultsTab: (n) => `全部 ${n} 項`,
+    checkedResultsTab: (n) => `已勾選 ${n} 項`,
     collapseSearch: '收合搜尋列',
     expandSearch: '展開搜尋列',
     footerDisclaimer: '免責文字：根據 IEA ETP Clean Energy Technology Guide 快取資料生成，正式引用前請核對原始 IEA 資料。',
@@ -1405,6 +1409,10 @@ const APP_LABELS = {
     showAllResults: 'Show all',
     changeProvider: 'Change',
     aiProviderPlaceholder: 'Choose an AI provider…',
+    expandFullList: 'Expand full list / checked items',
+    closeModal: 'Close',
+    allResultsTab: (n) => `All ${n}`,
+    checkedResultsTab: (n) => `${n} checked`,
     collapseSearch: 'Collapse search bar',
     expandSearch: 'Expand search bar',
     footerDisclaimer: 'Disclaimer: generated from cached IEA ETP Clean Energy Technology Guide data — verify against the original IEA source before formal citation.',
@@ -4149,17 +4157,21 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
           </h2>
           <span className="mt-2 flex-none w-9 h-[3px] rounded-full" style={{ background: 'linear-gradient(90deg,#4FD9E8,#F5A860)' }} />
 
+          {/* Sized in %/aspect-ratio (not fixed px) so the scene scales with
+              however much height this flex-1 box actually resolves to on a
+              given phone, instead of staying a fixed pixel size that reads
+              as "shrunk" on a screen where more height was available. */}
           <div className="relative flex-1 w-full max-w-xs mt-2 min-h-0">
             <div
-              className="absolute left-1/2 top-0 w-40 h-40 rounded-full animate-glow-breathe"
+              className="absolute left-1/2 top-0 h-[46%] aspect-square rounded-full animate-glow-breathe"
               style={{ background: 'radial-gradient(circle, rgba(79,217,232,0.32) 0%, rgba(79,217,232,0.12) 45%, rgba(79,217,232,0) 72%)' }}
             />
             <div
-              className="absolute left-1/2 top-3 w-14 h-14 rounded-full animate-sun-breathe"
+              className="absolute left-1/2 top-[4%] h-[17%] aspect-square rounded-full animate-sun-breathe"
               style={{ background: '#F5A860', boxShadow: '0 0 34px 10px rgba(245,168,96,0.55)' }}
             />
-            <WindTurbineIcon className="absolute right-3 top-0 w-9 h-32" duration="6s" />
-            <svg className="absolute bottom-0 left-0 w-full h-24" viewBox="0 0 300 96" preserveAspectRatio="none" aria-hidden="true">
+            <WindTurbineIcon className="absolute right-[4%] top-0 h-[38%] w-auto" duration="6s" />
+            <svg className="absolute bottom-0 left-0 w-full h-[28%]" viewBox="0 0 300 96" preserveAspectRatio="none" aria-hidden="true">
               <rect x="0" y="30" width="300" height="66" fill="#154B5C" />
               <path className="animate-wave-drift" d="M-60,26 Q0,8 60,26 T180,26 T300,26 T420,26 V96 H-60 Z" fill="#1D6E7C" />
               <path className="animate-wave-drift-rev" d="M-60,40 Q0,26 60,40 T180,40 T300,40 T420,40 V96 H-60 Z" fill="#28899A" opacity="0.6" />
@@ -4178,9 +4190,9 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
                 <line x1="156" y1="58" x2="157" y2="70" stroke="#EAF7FA" strokeWidth="1.4" opacity="0.5" />
               </g>
             </svg>
-            <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-left" style={{ bottom: '64px', left: '22%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
-            <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-mid" style={{ bottom: '58px', left: '50%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
-            <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-right" style={{ bottom: '64px', right: '18%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
+            <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-left" style={{ bottom: '22%', left: '22%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
+            <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-mid" style={{ bottom: '20%', left: '50%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
+            <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-right" style={{ bottom: '22%', right: '18%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
           </div>
 
           <div className="flex-none flex items-center gap-8 pb-2">
@@ -4281,6 +4293,12 @@ function Dashboard({
   // result set — mainly useful on mobile where "what exactly did I check?"
   // isn't visible at a glance the way it is on a wide desktop list.
   const [showOnlyChecked, setShowOnlyChecked] = useState(false);
+  // Mobile-only "expand full list" modal — the swipeable card carousel below
+  // only shows the current page (same ~20-item page the desktop list already
+  // paginates through); this modal is the actual "see everything, or just
+  // what I checked" view, listing the full result set with no extra paging.
+  const [showListModal, setShowListModal] = useState(false);
+  const [listModalScope, setListModalScope] = useState('all');
   // Mobile-only: the provider <select> and the API-key input never show at
   // the same time below md (there isn't room, and picking a provider then
   // immediately being handed its key field reads as one step, not two
@@ -4764,7 +4782,7 @@ function Dashboard({
           always shows dataset.generated_at (a real, static timestamp from
           the cached JSON), never a live-refresh countdown — this dataset
           doesn't auto-update, so implying it does would be misleading. */}
-      <header className="relative overflow-hidden bg-gradient-to-br from-cyan-500 via-blue-600 to-blue-800 px-6 py-3 2xl:py-5 shadow-lg z-10 flex-shrink-0">
+      <header className="hidden md:block relative overflow-hidden bg-gradient-to-br from-cyan-500 via-blue-600 to-blue-800 px-6 py-3 2xl:py-5 shadow-lg z-10 flex-shrink-0">
         {/* Decorative background — pointer-events-none, low opacity, sits
             behind the real content (z-0) so it never interferes with
             reading or clicking anything above it (z-10). */}
@@ -4901,6 +4919,45 @@ function Dashboard({
         </div>
       </header>
 
+      {/* Mobile-only topbar — a deliberately simpler bar than the desktop
+          header above (no status badges, no spinning turbines): title,
+          tech/case counts, dataset version, and the language toggle, over
+          the same scrolling-wave decoration. md: and up never render this
+          (the desktop header above handles that breakpoint instead). */}
+      <div className="md:hidden relative overflow-hidden bg-gradient-to-r from-cyan-500 to-blue-800 pl-3.5 pr-2.5 pt-4 pb-3.5 flex items-center justify-between gap-2 flex-shrink-0">
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-25">
+          <div className="absolute bottom-0 left-0 w-full h-2.5 overflow-hidden">
+            <div className="flex animate-wave-scroll" style={{ width: '200%' }}>
+              <svg viewBox="0 0 1200 40" className="w-1/2 flex-shrink-0" preserveAspectRatio="none">
+                <path d="M0,20 Q150,0 300,20 T600,20 T900,20 T1200,20 L1200,40 L0,40 Z" fill="white" />
+              </svg>
+              <svg viewBox="0 0 1200 40" className="w-1/2 flex-shrink-0" preserveAspectRatio="none">
+                <path d="M0,20 Q150,0 300,20 T600,20 T900,20 T1200,20 L1200,40 L0,40 Z" fill="white" />
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div className="relative z-10 min-w-0">
+          <div className="text-[13px] font-semibold text-white truncate">{L.appTitle}</div>
+          <div className="text-[10px] text-blue-100 mt-0.5 whitespace-nowrap">
+            {techCount}{uiLang === 'en' ? ' Technologies' : ' 項技術'}・{initiativeCount}{uiLang === 'en' ? ' Cases' : ' 個案例'}
+          </div>
+        </div>
+        <div className="relative z-10 flex items-center gap-1.5 flex-shrink-0">
+          <div className="text-[8px] text-white/90 bg-white/15 border border-white/25 rounded px-1.5 py-1 text-center leading-tight whitespace-nowrap">
+            {L.datasetTimeLabel}<br />{generatedAtLabel}
+          </div>
+          <button
+            type="button"
+            onClick={() => setUiLang(l => (l === 'zh' ? 'en' : 'zh'))}
+            title="Switch platform language / 切換平台語言"
+            className="text-[10px] font-semibold text-white bg-white/15 border border-white/25 rounded-full px-2.5 py-1.5"
+          >
+            {uiLang === 'zh' ? 'EN' : '中文'}
+          </button>
+        </div>
+      </div>
+
       {/* Mobile-only quick-nav — six buttons jumping straight to a section
           of the existing list/detail/strategy content instead of requiring
           list -> detail tab -> scroll -> strategy tab -> scroll. md: and up
@@ -5017,7 +5074,71 @@ function Dashboard({
             </div>
           </div>
 
-          <div ref={listContainerRef} className="flex-1 md:overflow-y-auto p-2 md:bg-white">
+          {/* Mobile-only: a swipeable card carousel instead of the vertical
+              list below (which becomes desktop-only) — same current page
+              of results, same checkbox state, just presented as cards you
+              flick through horizontally. The "expand" button opens a
+              full-screen modal over the *entire* result set (not just this
+              page) with an all/checked toggle. */}
+          <div className="md:hidden px-2 pt-2">
+            {totalMatches === 0 ? (
+              <div className="flex flex-col items-center justify-center text-slate-400 p-6 text-center">
+                <AlertCircle size={32} className="mb-2 opacity-50" />
+                <p>{L.noMatch}</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-2.5 overflow-x-auto pb-1" style={{ scrollSnapType: 'x mandatory', scrollbarWidth: 'none' }}>
+                  {paginatedResults.map((item, idx) => {
+                    const tech = item.tech;
+                    const primaryName = uiLang === 'en' ? (tech.technology_name || techLabel(tech)) : (tech.technology_name_zh || tech.technology_name || L.unlabeled);
+                    const secondaryName = uiLang === 'en' ? tech.technology_name_zh : tech.technology_name;
+                    return (
+                      <div
+                        key={idx}
+                        style={{ scrollSnapAlign: 'start' }}
+                        className="flex-shrink-0 w-[78%] bg-white/50 backdrop-blur-md border border-white/60 rounded-2xl shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] p-3.5"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2.5">
+                          <button
+                            onClick={() => {
+                              setSelectedTech(tech);
+                              setRightPanelTab('detail');
+                              setMobileView('panel');
+                              setQuickNavActive('detail');
+                              detailTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }}
+                            className="flex-1 min-w-0 text-left"
+                          >
+                            <div className="font-semibold text-slate-800 text-sm leading-snug line-clamp-2">{primaryName}</div>
+                            <div className="text-xs text-slate-500 mt-1 line-clamp-1">{secondaryName || L.unlabeled}</div>
+                          </button>
+                          <input
+                            type="checkbox"
+                            checked={checkedTechIds.has(tech._id)}
+                            onChange={() => toggleTechChecked(tech._id)}
+                            className="mt-0.5 w-4 h-4 accent-purple-600 flex-shrink-0 cursor-pointer"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-semibold text-blue-700 bg-blue-100/70 rounded px-1.5 py-0.5">{L.fieldTrl(tech.latest_trl || L.unlabeled)}</span>
+                          <span className="text-[11px] text-blue-700 font-medium">{L.caseCountInline(tech.linked_records_count || 0)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={() => { setListModalScope('all'); setShowListModal(true); }}
+                  className="mt-2.5 w-full text-center text-sm font-medium text-blue-700 bg-white/50 backdrop-blur-md border border-white/60 rounded-lg py-2.5"
+                >
+                  ⤢ {L.expandFullList}
+                </button>
+              </>
+            )}
+          </div>
+
+          <div ref={listContainerRef} className="hidden md:block flex-1 md:overflow-y-auto p-2 md:bg-white">
             {totalMatches === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 p-6 text-center">
                 <AlertCircle size={32} className="mb-2 opacity-50" />
@@ -5452,6 +5573,66 @@ function Dashboard({
       </main>
       )}
       <PptGuideModal isOpen={showPptGuide} onClose={() => setShowPptGuide(false)} uiLang={uiLang} />
+
+      {/* Mobile-only full-list modal — opened from the "expand" button below
+          the card carousel. Lists the *entire* current result set (not just
+          the carousel's one page), with an all/checked toggle; picking a row
+          closes the modal and jumps straight to its detail section. */}
+      {showListModal && (
+        <div className="md:hidden fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-[#EAF2FB] via-[#D3E3F6] to-[#AFC9EC]">
+          <div className="flex items-center justify-between px-4 pt-5 pb-3 flex-shrink-0">
+            <h3 className="text-sm font-semibold text-slate-800">{L.quickNavList}</h3>
+            <button onClick={() => setShowListModal(false)} className="text-sm font-medium text-slate-500 hover:text-slate-700 flex items-center gap-1">
+              {L.closeModal} <X size={14} />
+            </button>
+          </div>
+          <div className="flex gap-2 px-4 pb-3 flex-shrink-0">
+            <button
+              onClick={() => setListModalScope('all')}
+              className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${listModalScope === 'all' ? 'bg-blue-800 text-white border-blue-800' : 'bg-white/50 text-slate-600 border-white/70'}`}
+            >
+              {L.allResultsTab(totalMatches)}
+            </button>
+            <button
+              onClick={() => setListModalScope('checked')}
+              className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${listModalScope === 'checked' ? 'bg-blue-800 text-white border-blue-800' : 'bg-white/50 text-slate-600 border-white/70'}`}
+            >
+              {L.checkedResultsTab(checkedMatchCount)}
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 pb-6">
+            {(listModalScope === 'checked' ? searchData.results.filter(r => checkedTechIds.has(r.tech._id)) : searchData.results).map((item, idx) => {
+              const tech = item.tech;
+              const primaryName = uiLang === 'en' ? (tech.technology_name || techLabel(tech)) : (tech.technology_name_zh || tech.technology_name || L.unlabeled);
+              const secondaryName = uiLang === 'en' ? tech.technology_name_zh : tech.technology_name;
+              return (
+                <div key={idx} className="flex items-center gap-2.5 bg-white/55 backdrop-blur-md border border-white/70 rounded-lg px-3 py-2.5 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={checkedTechIds.has(tech._id)}
+                    onChange={() => toggleTechChecked(tech._id)}
+                    className="w-4 h-4 accent-purple-600 flex-shrink-0 cursor-pointer"
+                  />
+                  <button
+                    onClick={() => {
+                      setSelectedTech(tech);
+                      setRightPanelTab('detail');
+                      setMobileView('panel');
+                      setQuickNavActive('detail');
+                      setShowListModal(false);
+                      setTimeout(() => detailTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                    }}
+                    className="flex-1 min-w-0 text-left"
+                  >
+                    <div className="text-sm font-semibold text-slate-800 line-clamp-1">{primaryName}</div>
+                    <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{secondaryName || L.unlabeled}</div>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
