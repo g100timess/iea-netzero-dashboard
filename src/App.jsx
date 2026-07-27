@@ -1303,6 +1303,12 @@ const APP_LABELS = {
     changeProvider: '更改',
     aiProviderPlaceholder: '請選擇 AI 供應商…',
     expandFullList: '展開完整清單／已勾選項目',
+    mobileListDesc: '左右滑動瀏覽，勾選可加入策略總攬的分析範圍',
+    mobileSectorDesc: '點擊色塊可篩選技術清單',
+    mobileStrategyDesc: 'AI 生成的技術現況總覽與市場動態',
+    mobileExportDesc: '將目前篩選（或勾選）結果匯出成 CSV',
+    mobilePptDesc: '用 Gemini Notebook 把資料做成簡報',
+    currentlySelected: '目前選取：',
     closeModal: '關閉',
     allResultsTab: (n) => `全部 ${n} 項`,
     checkedResultsTab: (n) => `已勾選 ${n} 項`,
@@ -1410,6 +1416,12 @@ const APP_LABELS = {
     changeProvider: 'Change',
     aiProviderPlaceholder: 'Choose an AI provider…',
     expandFullList: 'Expand full list / checked items',
+    mobileListDesc: 'Swipe to browse — check any to add them to the 策略總攬 analysis scope',
+    mobileSectorDesc: 'Tap a slice to filter the technology list',
+    mobileStrategyDesc: 'AI-generated technology overview and market dynamics',
+    mobileExportDesc: 'Export the current filter (or checked items) as a CSV',
+    mobilePptDesc: 'Turn the data into slides with Gemini Notebook',
+    currentlySelected: 'Currently viewing: ',
     closeModal: 'Close',
     allResultsTab: (n) => `All ${n}`,
     checkedResultsTab: (n) => `${n} checked`,
@@ -4147,8 +4159,14 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
           <path d="M0,36 C70,6 110,60 170,32 C220,10 260,42 300,22 L300,64 L0,64 Z" fill="#0E2E52" />
         </svg>
 
-        {/* Energy-core scene: open glow (no card frame), sun, turbine, sea */}
-        <div className="relative flex-1 min-h-0 flex flex-col items-center px-6 pt-1">
+        {/* Energy-core scene: open glow (no card frame), sun, turbine, sea.
+            justify-center (rather than stretching the scene itself to fill
+            whatever's left) is what actually fixes the "shrunk on a tall
+            phone" report: the scene below has a fixed aspect ratio now, so
+            any extra vertical room this flex-1 box has on a taller screen
+            becomes symmetric breathing room around the whole block instead
+            of an ever-growing dead gap between the sun/turbine and the sea. */}
+        <div className="relative flex-1 min-h-0 flex flex-col items-center justify-center px-6">
           <h2
             className="text-center font-bold text-xl leading-snug"
             style={{ backgroundImage: 'linear-gradient(90deg,#FFFFFF,#CDEFF6)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}
@@ -4157,11 +4175,14 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
           </h2>
           <span className="mt-2 flex-none w-9 h-[3px] rounded-full" style={{ background: 'linear-gradient(90deg,#4FD9E8,#F5A860)' }} />
 
-          {/* Sized in %/aspect-ratio (not fixed px) so the scene scales with
-              however much height this flex-1 box actually resolves to on a
-              given phone, instead of staying a fixed pixel size that reads
-              as "shrunk" on a screen where more height was available. */}
-          <div className="relative flex-1 w-full max-w-xs mt-2 min-h-0">
+          {/* A fixed aspect ratio (not flex-1) — the box's own height now
+              always derives from its width, which barely varies across
+              phones, instead of from whatever's "left over" after the
+              photo/title/stats/CTA, which varies a lot and is what caused
+              the sun/turbine/sea to end up bunched with a big empty gap
+              between them on taller screens. Children inside are still
+              sized in % of *this* box, so they scale with it. */}
+          <div className="relative w-full max-w-xs mt-3 aspect-[4/5]">
             <div
               className="absolute left-1/2 top-0 h-[46%] aspect-square rounded-full animate-glow-breathe"
               style={{ background: 'radial-gradient(circle, rgba(79,217,232,0.32) 0%, rgba(79,217,232,0.12) 45%, rgba(79,217,232,0) 72%)' }}
@@ -4995,7 +5016,69 @@ function Dashboard({
             always shows it at its fixed width alongside the right panel,
             unchanged from before. */}
         <section className={`flex w-full md:w-[400px] lg:w-[460px] flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-gradient-to-b from-[#EAF2FB] via-[#D3E3F6] to-[#AFC9EC] md:bg-none md:bg-white flex-col md:h-full md:min-h-0`}>
-          <div className="p-3 2xl:p-4 border-b border-white/50 md:border-slate-100 bg-white/30 md:bg-slate-50 backdrop-blur-md md:backdrop-blur-none flex-shrink-0">
+          {/* Mobile-only list header — a clean rebuild matching the approved
+              mockup instead of reusing the desktop header's collapse toggle
+              and long copy: section title + one-line description, a real
+              subject/full-text search-mode toggle (same searchMode state
+              desktop uses), every official top-level sector as a swipeable
+              chip row (replacing the tree dropdown here — ITRI GEL still
+              gets its own chip, set to its root), then the search box. */}
+          <div className="md:hidden px-3 pt-3">
+            <h2 className="text-sm font-semibold text-slate-800">{L.quickNavList}</h2>
+            <p className="text-xs text-slate-500 mt-0.5 mb-3">{L.mobileListDesc}</p>
+
+            <div className="flex gap-2 mb-2.5">
+              <button
+                onClick={() => setSearchMode('subject')}
+                className={`flex-1 text-xs font-medium py-1.5 rounded-full border transition-colors ${searchMode === 'subject' ? 'bg-blue-800 text-white border-blue-800' : 'bg-white/50 text-slate-600 border-white/70'}`}
+              >
+                {L.subjectSearch}
+              </button>
+              <button
+                onClick={() => setSearchMode('fulltext')}
+                className={`flex-1 text-xs font-medium py-1.5 rounded-full border transition-colors ${searchMode === 'fulltext' ? 'bg-blue-800 text-white border-blue-800' : 'bg-white/50 text-slate-600 border-white/70'}`}
+              >
+                {L.fulltextSearch}
+              </button>
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-2 mb-2" style={{ scrollbarWidth: 'none' }}>
+              <button
+                onClick={() => { setSelectedSector(''); setPathFilter(null); }}
+                className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border whitespace-nowrap transition-colors ${!selectedSector && !pathFilter ? 'bg-blue-800 text-white border-blue-800' : 'bg-white/50 text-slate-600 border-white/70'}`}
+              >
+                {L.allSectors}
+              </button>
+              {Object.keys(FIXED_SECTORS).map(top => (
+                <button
+                  key={top}
+                  onClick={() => { setSelectedSector(top); setPathFilter(null); }}
+                  className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border whitespace-nowrap transition-colors ${selectedSector === top ? 'bg-blue-800 text-white border-blue-800' : 'bg-white/50 text-slate-600 border-white/70'}`}
+                >
+                  {uiLang === 'en' ? top : (SECTOR_TRANSLATIONS[top] || top)}
+                </button>
+              ))}
+              <button
+                onClick={() => { setSelectedSector('ITRI|GEL'); setPathFilter(null); }}
+                className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border whitespace-nowrap transition-colors ${typeof selectedSector === 'string' && selectedSector.startsWith('ITRI') ? 'bg-blue-800 text-white border-blue-800' : 'bg-white/50 text-slate-600 border-white/70'}`}
+              >
+                工研院 GEL
+              </button>
+            </div>
+
+            <div className="relative mb-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                type="text"
+                placeholder={L.searchPlaceholder}
+                className="w-full pl-9 pr-3 py-2 rounded-lg border border-white/70 bg-white/50 backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="hidden md:block p-3 2xl:p-4 border-b border-white/50 md:border-slate-100 bg-white/30 md:bg-slate-50 backdrop-blur-md md:backdrop-blur-none flex-shrink-0">
             {/* Collapsible search controls — folding these away hands their
                 vertical space to the technology list below, which is where
                 the checkbox-selection work actually happens. */}
@@ -5236,7 +5319,15 @@ function Dashboard({
           </div>
 
           <div className="flex flex-col lg:flex-row md:overflow-hidden md:min-h-0 md:flex-1">
-            <div ref={detailTopRef} className={`flex flex-col md:overflow-y-auto p-4 md:p-6 w-full ${rightPanelTab !== 'detail' ? 'md:hidden' : ''}`}>
+            <div ref={detailTopRef} className={`order-2 md:order-none flex flex-col md:overflow-y-auto p-4 md:p-6 w-full ${rightPanelTab !== 'detail' ? 'md:hidden' : ''}`}>
+                <div className="md:hidden mb-3">
+                  <h2 className="text-sm font-semibold text-slate-800">{L.detailTab}</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {selectedTech
+                      ? `${L.currentlySelected}${uiLang === 'en' ? (selectedTech.technology_name || techLabel(selectedTech)) : (selectedTech.technology_name_zh || selectedTech.technology_name || L.unlabeled)}`
+                      : L.selectPrompt}
+                  </p>
+                </div>
                 {!selectedTech ? (
                   <div className="m-auto text-center text-slate-400">
                     <FileText size={48} className="mx-auto mb-4 opacity-50" />
@@ -5355,67 +5446,75 @@ function Dashboard({
                 )}
               </div>
 
-            <div className={`flex flex-col md:overflow-y-auto p-4 md:p-8 w-full ${rightPanelTab !== 'strategy' ? 'md:hidden' : ''}`}>
+            {/* Sector-distribution donut — its own top-level block now (used
+                to be nested inside the strategy panel below) so it can carry
+                its own mobile scroll position: order-1 puts it right after
+                the tech list, before 技術詳情, matching the requested mobile
+                section order. md: and up keep the exact original desktop
+                behavior — visible only under the 策略總覽 tab, at its
+                original fixed width beside the report/export/ppt cards. */}
+            {totalMatches > 0 && (
+              <div className={`order-1 md:order-none p-4 md:p-0 lg:w-[340px] flex-shrink-0 ${rightPanelTab !== 'strategy' ? 'md:hidden' : ''}`}>
+                <div ref={sectorCardRef} className="bg-white/50 md:bg-white backdrop-blur-md md:backdrop-blur-none rounded-2xl shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200 border-t-4 border-t-blue-500 p-6 md:p-8 flex flex-col items-center">
+                  <h3 className="text-lg font-bold text-slate-800 mb-1 self-start">{L.sectorDistributionTitle}</h3>
+                  <p className="text-xs text-slate-400 mb-5 self-start">
+                    <span className="md:hidden">{L.mobileSectorDesc}</span>
+                    <span className="hidden md:inline">{L.sectorDistributionHint}</span>
+                  </p>
+                  {isCheckedSubsetActive && (
+                    <p className="text-sm text-purple-600 bg-purple-50 border border-purple-100 rounded px-2 py-1 mb-4 self-start">{L.checkedSubsetBadge(strategyCount)}</p>
+                  )}
+                  <DonutChart
+                    key={pathFilter ? pathFilter.join('>') : 'root'}
+                    segments={sectorDonutData}
+                    centerValue={strategyCount}
+                    centerLabel={L.sectorDistributionCenterLabel}
+                    size={208}
+                    strokeWidth={22}
+                    onLockChange={handleDonutSegmentClick}
+                  />
+                  {(canFilterNavBack || canFilterNavForward) && (
+                    <div className="flex items-center gap-2 mt-5">
+                      {canFilterNavBack && (
+                        <button
+                          onClick={onFilterNavBack}
+                          title={L.backOneLevel}
+                          className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          <ChevronLeft size={14} /> {L.backOneLevel}
+                        </button>
+                      )}
+                      {canFilterNavForward && (
+                        <button
+                          onClick={onFilterNavForward}
+                          title={L.forwardOneLevel}
+                          className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          {L.forwardOneLevel} <ChevronRight size={14} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {lockedSectorSummary && (
+                    <p className="text-base text-slate-600 leading-relaxed mt-5 pt-4 border-t border-slate-100 self-stretch">
+                      {lockedSectorSummary}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className={`order-3 md:order-none flex flex-col md:overflow-y-auto p-4 md:p-8 w-full ${rightPanelTab !== 'strategy' ? 'md:hidden' : ''}`}>
                 <div className="max-w-6xl mx-auto w-full">
                   <div className="mb-6">
                     <h2 className="text-xl font-bold text-slate-800">{L.strategyTitle}</h2>
-                    <p className="text-base text-slate-500 mt-1">{L.strategySubtitle}</p>
+                    <p className="text-base text-slate-500 mt-1">
+                      <span className="md:hidden">{L.mobileStrategyDesc}</span>
+                      <span className="hidden md:inline">{L.strategySubtitle}</span>
+                    </p>
                   </div>
 
                   <div className="flex flex-col lg:flex-row gap-6 items-stretch">
-                    {/* Sector-distribution donut — same plain-white-card look
-                        as the two cards beside it, just with a blue accent,
-                        for a cleaner and more cohesive page instead of a
-                        separate dark "control room" card. Clicking a slice
-                        drills the left-hand list down to that category (see
-                        handleDonutSegmentClick); the "back one level" button
-                        below undoes that one step at a time. */}
-                    {totalMatches > 0 && (
-                      <div ref={sectorCardRef} className="lg:w-[340px] flex-shrink-0 bg-white/50 md:bg-white backdrop-blur-md md:backdrop-blur-none rounded-2xl shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200 border-t-4 border-t-blue-500 p-6 md:p-8 flex flex-col items-center">
-                        <h3 className="text-lg font-bold text-slate-800 mb-1 self-start">{L.sectorDistributionTitle}</h3>
-                        <p className="text-xs text-slate-400 mb-5 self-start">{L.sectorDistributionHint}</p>
-                        {isCheckedSubsetActive && (
-                          <p className="text-sm text-purple-600 bg-purple-50 border border-purple-100 rounded px-2 py-1 mb-4 self-start">{L.checkedSubsetBadge(strategyCount)}</p>
-                        )}
-                        <DonutChart
-                          key={pathFilter ? pathFilter.join('>') : 'root'}
-                          segments={sectorDonutData}
-                          centerValue={strategyCount}
-                          centerLabel={L.sectorDistributionCenterLabel}
-                          size={208}
-                          strokeWidth={22}
-                          onLockChange={handleDonutSegmentClick}
-                        />
-                        {(canFilterNavBack || canFilterNavForward) && (
-                          <div className="flex items-center gap-2 mt-5">
-                            {canFilterNavBack && (
-                              <button
-                                onClick={onFilterNavBack}
-                                title={L.backOneLevel}
-                                className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
-                              >
-                                <ChevronLeft size={14} /> {L.backOneLevel}
-                              </button>
-                            )}
-                            {canFilterNavForward && (
-                              <button
-                                onClick={onFilterNavForward}
-                                title={L.forwardOneLevel}
-                                className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
-                              >
-                                {L.forwardOneLevel} <ChevronRight size={14} />
-                              </button>
-                            )}
-                          </div>
-                        )}
-                        {lockedSectorSummary && (
-                          <p className="text-base text-slate-600 leading-relaxed mt-5 pt-4 border-t border-slate-100 self-stretch">
-                            {lockedSectorSummary}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
                     <div className="flex-1 space-y-6 min-w-0">
                       {/* Strategy overview card — opens instantly with a rule-based
                           summary; the option to upgrade to an AI-generated version
