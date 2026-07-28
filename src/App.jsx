@@ -4204,11 +4204,11 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
               <ellipse cx="258" cy="98" rx="9" ry="4.5" fill="#4FD9E8" opacity="0.82" />
               <polygon points="249,98 241,93 241,103" fill="#4FD9E8" opacity="0.82" />
             </g>
-            <g className="animate-jelly-drift" style={{ transformOrigin: '124px 66px' }}>
-              <path d="M113,62 Q124,49 135,62 Q135,70 124,70 Q113,70 113,62 Z" fill="#EAF7FA" opacity="0.6" />
-              <line x1="118" y1="70" x2="117" y2="84" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
-              <line x1="124" y1="70" x2="124" y2="87" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
-              <line x1="130" y1="70" x2="131" y2="84" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
+            <g className="animate-jelly-drift" style={{ transformOrigin: '225px 48px' }}>
+              <path d="M214,44 Q225,31 236,44 Q236,52 225,52 Q214,52 214,44 Z" fill="#EAF7FA" opacity="0.6" />
+              <line x1="219" y1="52" x2="218" y2="66" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
+              <line x1="225" y1="52" x2="225" y2="69" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
+              <line x1="231" y1="52" x2="232" y2="66" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
             </g>
           </svg>
 
