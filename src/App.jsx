@@ -4135,11 +4135,13 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
       <button
         type="button"
         onClick={handleEnter}
-        className="w-full h-[100dvh] flex flex-col text-left overflow-hidden"
+        className="relative block w-full h-[100dvh] text-left overflow-hidden"
         aria-label={isEn ? 'Tap to enter the dashboard' : '輕觸進入儀表板'}
       >
-        {/* Real rooftop-solar photo, cropped tighter on the house itself */}
-        <div className="relative flex-none h-[29dvh] min-h-0 max-h-none overflow-hidden">
+        {/* The house occupies its own fixed upper scene.  Everything below is
+            absolutely positioned from the same mobile-only canvas, so a tall
+            phone cannot pull the sun, turbine and sea away from each other. */}
+        <div className="absolute inset-x-0 top-0 h-[32dvh] overflow-hidden">
           <div
             className="absolute inset-0 bg-cover"
             style={{
@@ -4154,86 +4156,72 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
           </div>
         </div>
 
-        {/* Wave divider — pulled up over the seam so it reads as one curved edge */}
-        <svg className="relative -mt-6 z-10 w-full h-8 flex-none" viewBox="0 0 300 64" preserveAspectRatio="none" aria-hidden="true">
+        {/* Curved transition from the home into the energy-core scene. */}
+        <svg className="absolute left-0 top-[calc(32dvh-32px)] z-10 w-full h-8" viewBox="0 0 300 64" preserveAspectRatio="none" aria-hidden="true">
           <path d="M0,36 C70,6 110,60 170,32 C220,10 260,42 300,22 L300,64 L0,64 Z" fill="#0E2E52" />
         </svg>
 
-        {/* Energy-core scene: open glow (no card frame), sun, turbine, sea.
-            flex-none (not flex-1) on purpose: a flex-1 box can be squeezed
-            by the flexbox algorithm below its flex-shrink-0 children's real
-            size on a short viewport, and the next sibling (the CTA band)
-            then starts from that squeezed edge — landing on top of the
-            still-full-size-but-clipped content instead of below it. Staying
-            flex-none means this section is always exactly as tall as its
-            content, so nothing after it can ever overlap it; the outer
-            button's overflow-y-auto is the fallback if the whole stack is
-            ever taller than the viewport. */}
-        <div className="relative flex-none flex flex-col items-center px-6 pt-2">
+        {/* Full lower scene.  Children use scene-relative positions rather
+            than flex stacking, preserving the approved composition on every
+            portrait phone height. */}
+        <div className="absolute inset-x-0 bottom-0 top-[32dvh] bg-[#0E2E52] overflow-hidden">
           <h2
-            className="text-center font-bold text-xl leading-snug flex-shrink-0"
+            className="absolute z-20 top-[8%] left-1/2 w-full -translate-x-1/2 text-center font-bold text-[28px] leading-[1.25]"
             style={{ backgroundImage: 'linear-gradient(90deg,#FFFFFF,#CDEFF6)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}
           >
             {isEn ? <>IEA Net-Zero Tech<br />Intelligence Platform</> : <>IEA 淨零技術<br />智慧分析平台</>}
           </h2>
-          <span className="mt-2 flex-shrink-0 w-9 h-[3px] rounded-full" style={{ background: 'linear-gradient(90deg,#4FD9E8,#F5A860)' }} />
+          <span className="absolute z-20 top-[23%] left-1/2 -translate-x-1/2 w-12 h-1 rounded-full" style={{ background: 'linear-gradient(90deg,#4FD9E8,#F5A860)' }} />
 
-          {/* Sized independently in vh + px (both capped), not tied to
-              width via aspect-ratio, since the constrained dimension here
-              is height, not width — this keeps the scene safely within
-              whatever room is actually left, on any phone. */}
-          <div className="relative w-[88%] max-w-none h-[31dvh] max-h-none min-h-0 mt-3 flex-shrink-0">
-            <div
-              className="absolute left-1/2 top-0 h-[46%] aspect-square rounded-full animate-glow-breathe"
-              style={{ background: 'radial-gradient(circle, rgba(79,217,232,0.32) 0%, rgba(79,217,232,0.12) 45%, rgba(79,217,232,0) 72%)' }}
-            />
-            <div
-              className="absolute left-1/2 top-[4%] h-[17%] aspect-square rounded-full animate-sun-breathe"
-              style={{ background: '#F5A860', boxShadow: '0 0 34px 10px rgba(245,168,96,0.55)' }}
-            />
-            <WindTurbineIcon className="absolute right-[4%] top-0 h-[38%] w-auto" duration="6s" />
-            <svg className="absolute bottom-0 left-0 w-full h-[28%]" viewBox="0 0 300 96" preserveAspectRatio="none" aria-hidden="true">
-              <rect x="0" y="30" width="300" height="66" fill="#154B5C" />
-              <path className="animate-wave-drift" d="M-60,26 Q0,8 60,26 T180,26 T300,26 T420,26 V96 H-60 Z" fill="#1D6E7C" />
-              <path className="animate-wave-drift-rev" d="M-60,40 Q0,26 60,40 T180,40 T300,40 T420,40 V96 H-60 Z" fill="#28899A" opacity="0.6" />
-              <g className="animate-fish-swim" style={{ transformOrigin: '66px 60px' }}>
-                <ellipse cx="66" cy="60" rx="10" ry="5" fill="#EAF7FA" opacity="0.85" />
-                <polygon points="56,60 48,55 48,65" fill="#EAF7FA" opacity="0.85" />
-              </g>
-              <g className="animate-fish-swim-rev" style={{ transformOrigin: '220px 76px' }}>
-                <ellipse cx="220" cy="76" rx="8" ry="4" fill="#4FD9E8" opacity="0.8" />
-                <polygon points="212,76 205,72 205,80" fill="#4FD9E8" opacity="0.8" />
-              </g>
-              <g className="animate-jelly-drift" style={{ transformOrigin: '150px 54px' }}>
-                <path d="M140,50 Q150,38 160,50 Q160,58 150,58 Q140,58 140,50 Z" fill="#EAF7FA" opacity="0.55" />
-                <line x1="144" y1="58" x2="143" y2="70" stroke="#EAF7FA" strokeWidth="1.4" opacity="0.5" />
-                <line x1="150" y1="58" x2="150" y2="72" stroke="#EAF7FA" strokeWidth="1.4" opacity="0.5" />
-                <line x1="156" y1="58" x2="157" y2="70" stroke="#EAF7FA" strokeWidth="1.4" opacity="0.5" />
-              </g>
-            </svg>
-            <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-left" style={{ bottom: '22%', left: '22%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
-            <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-mid" style={{ bottom: '20%', left: '50%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
-            <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-right" style={{ bottom: '22%', right: '18%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
-          </div>
+          <div className="absolute z-10 left-1/2 top-[29%] w-[48%] aspect-square -translate-x-1/2 rounded-full animate-glow-breathe" style={{ background: 'radial-gradient(circle, rgba(79,217,232,0.32) 0%, rgba(79,217,232,0.12) 45%, rgba(79,217,232,0) 72%)' }} />
+          <div className="absolute z-20 left-1/2 top-[33%] w-[23%] aspect-square -translate-x-1/2 rounded-full animate-sun-breathe" style={{ background: '#F5A860', boxShadow: '0 0 34px 10px rgba(245,168,96,0.55)' }} />
+          <WindTurbineIcon className="absolute z-20 right-[10%] top-[27%] h-[37%] w-auto" duration="6s" />
 
-          <div className="flex-none flex items-center gap-8 mt-3 pb-2">
+          {/* The sea deliberately fills through the CTA area, matching the
+              reference instead of ending as a small, detached wave strip. */}
+          <svg className="absolute z-10 bottom-0 left-0 w-full h-[48%]" viewBox="0 0 300 160" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="mobile-splash-sea-gradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#258797" />
+                <stop offset="60%" stopColor="#257E8B" />
+                <stop offset="100%" stopColor="#0E2E52" />
+              </linearGradient>
+            </defs>
+            <rect x="0" y="26" width="300" height="134" fill="url(#mobile-splash-sea-gradient)" />
+            <path className="animate-wave-drift" d="M-60,26 Q0,8 60,26 T180,26 T300,26 T420,26 V160 H-60 Z" fill="#1D6E7C" opacity="0.9" />
+            <path className="animate-wave-drift-rev" d="M-60,42 Q0,26 60,42 T180,42 T300,42 T420,42 V160 H-60 Z" fill="#3C9AA6" opacity="0.58" />
+            <g className="animate-fish-swim" style={{ transformOrigin: '78px 78px' }}>
+              <ellipse cx="78" cy="78" rx="11" ry="5.5" fill="#EAF7FA" opacity="0.9" />
+              <polygon points="67,78 58,72 58,84" fill="#EAF7FA" opacity="0.9" />
+            </g>
+            <g className="animate-fish-swim-rev" style={{ transformOrigin: '225px 98px' }}>
+              <ellipse cx="225" cy="98" rx="9" ry="4.5" fill="#4FD9E8" opacity="0.82" />
+              <polygon points="216,98 208,93 208,103" fill="#4FD9E8" opacity="0.82" />
+            </g>
+            <g className="animate-jelly-drift" style={{ transformOrigin: '150px 66px' }}>
+              <path d="M139,62 Q150,49 161,62 Q161,70 150,70 Q139,70 139,62 Z" fill="#EAF7FA" opacity="0.6" />
+              <line x1="144" y1="70" x2="143" y2="84" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
+              <line x1="150" y1="70" x2="150" y2="87" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
+              <line x1="156" y1="70" x2="157" y2="84" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
+            </g>
+          </svg>
+
+          <span className="absolute z-20 w-1.5 h-1.5 rounded-full bg-[#4FD9E8] animate-spark-rise-left" style={{ top: '26%', left: '20%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
+          <span className="absolute z-20 w-1.5 h-1.5 rounded-full bg-[#4FD9E8] animate-spark-rise-mid" style={{ top: '45%', left: '50%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
+          <span className="absolute z-20 w-1.5 h-1.5 rounded-full bg-[#4FD9E8] animate-spark-rise-right" style={{ top: '24%', right: '15%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
+
+          <div className="absolute z-20 top-[70%] left-1/2 flex -translate-x-1/2 items-center gap-10">
             <div className="text-center">
-              <div className="text-lg font-semibold text-white font-mono tabular-nums">{techCount}</div>
-              <div className="text-[10px] text-[#8FB4C0] mt-0.5">{isEn ? 'Technologies' : '項技術'}</div>
+              <div className="text-[22px] font-semibold text-white font-mono tabular-nums">{techCount}</div>
+              <div className="text-[11px] text-[#D0E8ED] mt-0.5">{isEn ? 'Technologies' : '項技術'}</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-semibold text-white font-mono tabular-nums">{initiativeCount}</div>
-              <div className="text-[10px] text-[#8FB4C0] mt-0.5">{isEn ? 'Cases' : '個案例'}</div>
+              <div className="text-[22px] font-semibold text-white font-mono tabular-nums">{initiativeCount}</div>
+              <div className="text-[11px] text-[#D0E8ED] mt-0.5">{isEn ? 'Cases' : '個案例'}</div>
             </div>
           </div>
-        </div>
 
-        {/* CTA band — a gradient bar instead of a boxed button, blending with the sea above it */}
-        <div
-          className="flex-none flex items-center justify-center pb-6 pt-6"
-          style={{ background: 'linear-gradient(180deg, rgba(29,110,124,0) 0%, rgba(20,68,86,0.85) 45%, #0E2E52 100%)' }}
-        >
-          <span className="text-white text-sm font-semibold tracking-wide">{isEn ? 'Start exploring →' : '開始探索 →'}</span>
+          <span className="absolute z-20 left-1/2 -translate-x-1/2 text-white text-base font-semibold tracking-wide whitespace-nowrap" style={{ bottom: 'max(1.75rem, env(safe-area-inset-bottom))' }}>{isEn ? 'Start exploring →' : '開始探索 →'}</span>
         </div>
       </button>
     </div>
