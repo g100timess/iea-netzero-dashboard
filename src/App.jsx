@@ -4135,11 +4135,11 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
       <button
         type="button"
         onClick={handleEnter}
-        className="w-full h-full flex flex-col text-left overflow-y-auto"
+        className="w-full h-[100dvh] flex flex-col text-left overflow-hidden"
         aria-label={isEn ? 'Tap to enter the dashboard' : '輕觸進入儀表板'}
       >
         {/* Real rooftop-solar photo, cropped tighter on the house itself */}
-        <div className="relative flex-none h-[34vh] min-h-[190px] max-h-[300px] overflow-hidden">
+        <div className="relative flex-none h-[29dvh] min-h-0 max-h-none overflow-hidden">
           <div
             className="absolute inset-0 bg-cover"
             style={{
@@ -4182,7 +4182,7 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
               width via aspect-ratio, since the constrained dimension here
               is height, not width — this keeps the scene safely within
               whatever room is actually left, on any phone. */}
-          <div className="relative w-[70%] max-w-[240px] h-[24vh] max-h-[190px] min-h-[140px] mt-3 flex-shrink-0">
+          <div className="relative w-[88%] max-w-none h-[31dvh] max-h-none min-h-0 mt-3 flex-shrink-0">
             <div
               className="absolute left-1/2 top-0 h-[46%] aspect-square rounded-full animate-glow-breathe"
               style={{ background: 'radial-gradient(circle, rgba(79,217,232,0.32) 0%, rgba(79,217,232,0.12) 45%, rgba(79,217,232,0) 72%)' }}
