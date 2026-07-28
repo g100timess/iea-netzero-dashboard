@@ -4135,7 +4135,7 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
       <button
         type="button"
         onClick={handleEnter}
-        className="w-full h-full flex flex-col text-left"
+        className="w-full h-full flex flex-col text-left overflow-y-auto"
         aria-label={isEn ? 'Tap to enter the dashboard' : '輕觸進入儀表板'}
       >
         {/* Real rooftop-solar photo, cropped tighter on the house itself */}
@@ -4160,29 +4160,29 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
         </svg>
 
         {/* Energy-core scene: open glow (no card frame), sun, turbine, sea.
-            justify-center (rather than stretching the scene itself to fill
-            whatever's left) is what actually fixes the "shrunk on a tall
-            phone" report: the scene below has a fixed aspect ratio now, so
-            any extra vertical room this flex-1 box has on a taller screen
-            becomes symmetric breathing room around the whole block instead
-            of an ever-growing dead gap between the sun/turbine and the sea. */}
-        <div className="relative flex-1 min-h-0 flex flex-col items-center justify-center px-6">
+            flex-none (not flex-1) on purpose: a flex-1 box can be squeezed
+            by the flexbox algorithm below its flex-shrink-0 children's real
+            size on a short viewport, and the next sibling (the CTA band)
+            then starts from that squeezed edge — landing on top of the
+            still-full-size-but-clipped content instead of below it. Staying
+            flex-none means this section is always exactly as tall as its
+            content, so nothing after it can ever overlap it; the outer
+            button's overflow-y-auto is the fallback if the whole stack is
+            ever taller than the viewport. */}
+        <div className="relative flex-none flex flex-col items-center px-6 pt-2">
           <h2
-            className="text-center font-bold text-xl leading-snug"
+            className="text-center font-bold text-xl leading-snug flex-shrink-0"
             style={{ backgroundImage: 'linear-gradient(90deg,#FFFFFF,#CDEFF6)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}
           >
             {isEn ? <>IEA Net-Zero Tech<br />Intelligence Platform</> : <>IEA 淨零技術<br />智慧分析平台</>}
           </h2>
-          <span className="mt-2 flex-none w-9 h-[3px] rounded-full" style={{ background: 'linear-gradient(90deg,#4FD9E8,#F5A860)' }} />
+          <span className="mt-2 flex-shrink-0 w-9 h-[3px] rounded-full" style={{ background: 'linear-gradient(90deg,#4FD9E8,#F5A860)' }} />
 
-          {/* A fixed aspect ratio (not flex-1) — the box's own height now
-              always derives from its width, which barely varies across
-              phones, instead of from whatever's "left over" after the
-              photo/title/stats/CTA, which varies a lot and is what caused
-              the sun/turbine/sea to end up bunched with a big empty gap
-              between them on taller screens. Children inside are still
-              sized in % of *this* box, so they scale with it. */}
-          <div className="relative w-full max-w-xs mt-3 aspect-[4/5]">
+          {/* Sized independently in vh + px (both capped), not tied to
+              width via aspect-ratio, since the constrained dimension here
+              is height, not width — this keeps the scene safely within
+              whatever room is actually left, on any phone. */}
+          <div className="relative w-[70%] max-w-[240px] h-[24vh] max-h-[190px] min-h-[140px] mt-3 flex-shrink-0">
             <div
               className="absolute left-1/2 top-0 h-[46%] aspect-square rounded-full animate-glow-breathe"
               style={{ background: 'radial-gradient(circle, rgba(79,217,232,0.32) 0%, rgba(79,217,232,0.12) 45%, rgba(79,217,232,0) 72%)' }}
@@ -4216,7 +4216,7 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
             <span className="absolute w-1 h-1 rounded-full bg-[#4FD9E8] animate-spark-rise-right" style={{ bottom: '22%', right: '18%', boxShadow: '0 0 6px 2px rgba(79,217,232,0.7)' }} />
           </div>
 
-          <div className="flex-none flex items-center gap-8 pb-2">
+          <div className="flex-none flex items-center gap-8 mt-3 pb-2">
             <div className="text-center">
               <div className="text-lg font-semibold text-white font-mono tabular-nums">{techCount}</div>
               <div className="text-[10px] text-[#8FB4C0] mt-0.5">{isEn ? 'Technologies' : '項技術'}</div>
