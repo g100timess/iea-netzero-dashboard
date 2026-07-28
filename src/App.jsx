@@ -4179,9 +4179,9 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
           </h2>
           <span className="absolute z-20 top-[25%] left-1/2 -translate-x-1/2 w-12 h-1 rounded-full" style={{ background: 'linear-gradient(90deg,#4FD9E8,#F5A860)' }} />
 
-          <div className="absolute z-10 left-1/2 top-[29%] w-[48%] aspect-square -translate-x-1/2 rounded-full animate-glow-breathe" style={{ background: 'radial-gradient(circle, rgba(79,217,232,0.32) 0%, rgba(79,217,232,0.12) 45%, rgba(79,217,232,0) 72%)' }} />
+          <div className="absolute z-0 left-1/2 top-[29%] w-[48%] aspect-square -translate-x-1/2 rounded-full animate-glow-breathe" style={{ background: 'radial-gradient(circle, rgba(79,217,232,0.32) 0%, rgba(79,217,232,0.12) 45%, rgba(79,217,232,0) 72%)' }} />
           <div className="absolute z-20 left-1/2 top-[33%] w-[23%] aspect-square -translate-x-1/2 rounded-full animate-sun-breathe" style={{ background: '#F5A860', boxShadow: '0 0 34px 10px rgba(245,168,96,0.55)' }} />
-          <WindTurbineIcon className="absolute z-30 right-[10%] top-[27%] h-[37%] w-auto" duration="6s" rotateAroundHub />
+          <WindTurbineIcon className="absolute z-40 right-[10%] top-[27%] h-[37%] w-auto overflow-visible" duration="6s" rotateAroundHub />
 
           {/* The sea deliberately fills through the CTA area, matching the
               reference instead of ending as a small, detached wave strip. */}
@@ -4196,19 +4196,19 @@ function MobileSplash({ onEnter, uiLang, techCount, initiativeCount }) {
             <rect x="0" y="26" width="300" height="134" fill="url(#mobile-splash-sea-gradient)" />
             <path className="animate-wave-drift" d="M-60,26 Q0,8 60,26 T180,26 T300,26 T420,26 V160 H-60 Z" fill="#1D6E7C" opacity="0.9" />
             <path className="animate-wave-drift-rev" d="M-60,42 Q0,26 60,42 T180,42 T300,42 T420,42 V160 H-60 Z" fill="#3C9AA6" opacity="0.58" />
-            <g className="animate-fish-swim" style={{ transformOrigin: '50px 78px' }}>
-              <ellipse cx="50" cy="78" rx="11" ry="5.5" fill="#EAF7FA" opacity="0.9" />
-              <polygon points="39,78 30,72 30,84" fill="#EAF7FA" opacity="0.9" />
+            <g className="animate-fish-swim" style={{ transformOrigin: '28px 78px' }}>
+              <ellipse cx="28" cy="78" rx="11" ry="5.5" fill="#EAF7FA" opacity="0.9" />
+              <polygon points="17,78 8,72 8,84" fill="#EAF7FA" opacity="0.9" />
             </g>
             <g className="animate-fish-swim-rev" style={{ transformOrigin: '258px 98px' }}>
               <ellipse cx="258" cy="98" rx="9" ry="4.5" fill="#4FD9E8" opacity="0.82" />
               <polygon points="249,98 241,93 241,103" fill="#4FD9E8" opacity="0.82" />
             </g>
-            <g className="animate-jelly-drift" style={{ transformOrigin: '140px 66px' }}>
-              <path d="M129,62 Q140,49 151,62 Q151,70 140,70 Q129,70 129,62 Z" fill="#EAF7FA" opacity="0.6" />
-              <line x1="134" y1="70" x2="133" y2="84" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
-              <line x1="140" y1="70" x2="140" y2="87" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
-              <line x1="146" y1="70" x2="147" y2="84" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
+            <g className="animate-jelly-drift" style={{ transformOrigin: '124px 66px' }}>
+              <path d="M113,62 Q124,49 135,62 Q135,70 124,70 Q113,70 113,62 Z" fill="#EAF7FA" opacity="0.6" />
+              <line x1="118" y1="70" x2="117" y2="84" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
+              <line x1="124" y1="70" x2="124" y2="87" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
+              <line x1="130" y1="70" x2="131" y2="84" stroke="#EAF7FA" strokeWidth="1.5" opacity="0.55" />
             </g>
           </svg>
 
