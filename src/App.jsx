@@ -168,6 +168,23 @@ ITRI_SUBGROUP_ORDER.forEach(code => {
 });
 const ITRI_LETTER_ORDER = Object.keys(ITRI_LETTER_GROUPS);
 
+const ITRI_LETTER_NAMES_ZH = {
+  C: '低碳與儲能技術組',
+  D: '智慧節能系統技術組',
+  G: '能源政策及推動組',
+  H: '地熱與海域前瞻能源技術組',
+  J: '高效率設備與建築節能技術組',
+  N: '環境與安全技術組',
+  P: '永續環境技術組',
+  R: '先進光電與整合應用技術組',
+  U: '電網與電力電子技術',
+  V: '綠能推動組',
+};
+function itriLetterLabel(letter, uiLang) {
+  const zh = ITRI_LETTER_NAMES_ZH[letter];
+  return uiLang === 'en' || !zh ? letter : `${zh} (${letter})`;
+}
+
 // Single lookup covering both curated-list sub-groups (ITRI_SUBGROUP_TECH_MAP)
 // and category-proxy sub-groups (ITRI_SUBGROUP_CATEGORY_MAP), for anything
 // that only needs the display name (zh/en), not the matching logic.
@@ -3923,6 +3940,58 @@ function WindTurbineIcon({ className, style, duration, rotateAroundHub = false }
   );
 }
 
+// Mobile counterpart of the ITRI branch in SectorTreeDropdown: once the
+// "工研院 GEL" chip is active, one extra swipeable chip row per level appears
+// (letter group → sub-group → category), each led by an "all" chip that
+// selects that level itself, using the same selectedSector path values.
+function MobileItriChips({ selectedSector, setSelectedSector, setPathFilter, uiLang }) {
+  if (typeof selectedSector !== 'string' || !selectedSector.startsWith('ITRI')) return null;
+  const parts = selectedSector.split('|');
+  const letter = parts[2];
+  const code = parts[3];
+  const allWord = uiLang === 'en' ? 'All' : '全部';
+  const pick = (val) => { setSelectedSector(val); setPathFilter(null); };
+  const chip = (key, label, val) => (
+    <button
+      key={key}
+      onClick={() => pick(val)}
+      className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border whitespace-nowrap transition-colors ${selectedSector === val ? 'bg-blue-800 text-white border-blue-800' : 'bg-white/50 text-slate-600 border-white/70'}`}
+    >
+      {label}
+    </button>
+  );
+  const tr = (name) => (uiLang === 'en' ? name : (SECTOR_TRANSLATIONS[name] || name));
+  const proxy = code ? ITRI_SUBGROUP_CATEGORY_MAP[code] : null;
+  const rowClass = 'flex gap-2 overflow-x-auto pb-2 mb-2';
+
+  return (
+    <>
+      <div className={rowClass} style={{ scrollbarWidth: 'none' }}>
+        {chip('gel', `${allWord} GEL`, 'ITRI|GEL')}
+        {ITRI_LETTER_ORDER.map(l => chip(l, itriLetterLabel(l, uiLang), `ITRI|GEL|${l}`))}
+      </div>
+      {letter && ITRI_LETTER_GROUPS[letter] && (
+        <div className={rowClass} style={{ scrollbarWidth: 'none' }}>
+          {chip('letter', `${allWord} ${letter}`, `ITRI|GEL|${letter}`)}
+          {ITRI_LETTER_GROUPS[letter].map(c => {
+            const info = getItriSubgroupInfo(c);
+            return chip(c, `${c} ${uiLang === 'en' ? info.en : info.zh}`, `ITRI|GEL|${letter}|${c}`);
+          })}
+        </div>
+      )}
+      {proxy && proxy.categories.length > 1 && (
+        <div className={rowClass} style={{ scrollbarWidth: 'none' }}>
+          {chip('code', `${allWord} ${code}`, `ITRI|GEL|${letter}|${code}`)}
+          {proxy.categories.map((ref, i) => {
+            const [top, sub] = ref.split('|');
+            return chip(ref, tr(sub || top), `ITRI|GEL|${letter}|${code}|${i}`);
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
 // Custom tree-style sector dropdown — replaces a plain <select> because the
 // ITRI branch needs actual expand/collapse at the letter-group level
 // (C/D/H/J/N/P/R/U default collapsed, hiding C100-C400 etc. until toggled),
@@ -3937,6 +4006,24 @@ function SectorTreeDropdown({ value, onChange, uiLang, L }) {
   const [expandedCodes, setExpandedCodes] = useState(() => new Set());
   const [itriGelExpanded, setItriGelExpanded] = useState(false);
   const containerRef = useRef(null);
+  const listRef = useRef(null);
+
+  // Whenever the selection is inside the ITRI branch, open exactly the nodes
+  // on the path to it so the chosen row is visible without re-expanding by hand.
+  useEffect(() => {
+    if (typeof value !== 'string' || !value.startsWith('ITRI')) return;
+    const parts = value.split('|');
+    setItriGelExpanded(true);
+    if (parts.length >= 3) setExpandedLetters(prev => new Set(prev).add(parts[2]));
+    if (parts.length >= 4) setExpandedCodes(prev => new Set(prev).add(parts[3]));
+  }, [value]);
+
+  useEffect(() => {
+    if (!open || typeof value !== 'string' || !value.startsWith('ITRI')) return;
+    const list = listRef.current;
+    const row = list?.querySelector('.bg-blue-50');
+    if (list && row) list.scrollTop = row.offsetTop - list.clientHeight / 2;
+  }, [open, value]);
 
   useEffect(() => {
     if (!open) return;
@@ -3981,7 +4068,7 @@ function SectorTreeDropdown({ value, onChange, uiLang, L }) {
     if (parts[0] === 'ITRI') {
       if (parts.length === 1) return L.researchFieldLabel;
       if (parts.length === 2) return L.itriGelLabel;
-      if (parts.length === 3) return parts[2];
+      if (parts.length === 3) return itriLetterLabel(parts[2], uiLang);
       const code = parts[3];
       const entry = getItriSubgroupInfo(code);
       const codeLabel = entry ? `${code} ${uiLang === 'en' ? entry.en : entry.zh}` : code;
@@ -4009,7 +4096,7 @@ function SectorTreeDropdown({ value, onChange, uiLang, L }) {
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full max-h-80 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg p-1.5 space-y-0.5">
+        <div ref={listRef} className="absolute z-20 mt-1 w-full max-h-80 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg p-1.5 space-y-0.5">
           <button type="button" onClick={() => select('')} className={rowClass('')}>{L.allSectors}</button>
 
           {Object.entries(FIXED_SECTORS).map(([sector, subsectors]) => (
@@ -4066,7 +4153,7 @@ function SectorTreeDropdown({ value, onChange, uiLang, L }) {
                     onClick={() => select(letterValue)}
                     className={`flex-1 text-left py-1.5 pr-3 text-sm truncate ${value === letterValue ? 'text-blue-700 font-semibold' : 'text-slate-700'}`}
                   >
-                    {letter}
+                    {itriLetterLabel(letter, uiLang)}
                   </button>
                 </div>
                 {isExpanded && ITRI_LETTER_GROUPS[letter].map(code => {
@@ -5063,6 +5150,13 @@ function Dashboard({
                 工研院 GEL
               </button>
             </div>
+
+            <MobileItriChips
+              selectedSector={selectedSector}
+              setSelectedSector={setSelectedSector}
+              setPathFilter={setPathFilter}
+              uiLang={uiLang}
+            />
 
             <div className="relative mb-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
