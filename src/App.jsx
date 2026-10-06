@@ -62,15 +62,15 @@ const DEFAULT_JSON = {
 };
 
 const FIXED_SECTORS = {
-  "Industry": ["Aluminium", "Metallic products", "Cement and concrete", "Chemicals and plastics", "Industrial heating", "Iron and steel", "Pulp and paper"],
+  "Industry": ["Aluminium", "Metallic products", "Cement and concrete", "Chemicals", "Industrial heating", "Iron and steel", "Pulp and paper"],
   "Buildings": ["Cooking technologies", "Operations and equipment", "Design and envelope"],
   "Transport": ["Rail", "Aviation", "Road transport", "Shipping"],
-  "Fossil fuels": ["Coal", "Oil and Gas"],
+  "Fossil fuels": ["Coal", "Oil and gas"],
   "Renewables": ["Hydropower", "Ocean", "Wind", "Bioenergy", "Geothermal", "Solar"],
   "Nuclear": ["Fission", "Fusion"],
   "Hydrogen": ["Sythetic fuels production", "H2 infrastructure", "Power generation", "Production"],
-  "Energy networks and storage": ["Thermal storage for buildings and district heating", "Mechanical storage", "Electrochemical storage", "Thermal storage", "Physical grids", "Smart grids"],
-  "Carbon Capture and Storage": ["CO2 capture", "CO2 storage", "CO2 transport"],
+  "Energy networks and storage": ["District level thermal networks and storage", "Mechanical storage", "Electrochemical storage", "Thermal storage", "Power grids"],
+  "Carbon capture and storage": ["CO2 capture", "CO2 storage", "CO2 transport"],
   "Critical minerals": ["Mineral processing and refining", "Mining and extraction", "E-waste recycling"]
 };
 
@@ -83,9 +83,9 @@ const FIXED_SECTORS = {
 // and sub-groups with zero matches (D100, J200, N300, P100~P300, R300,
 // U400, U600) are omitted since selecting them would always show nothing.
 const ITRI_SUBGROUP_TECH_MAP = {
-  "C100": { zh: "低碳燃燒與碳循環", en: "Low-Carbon Combustion & Carbon Cycling", techIds: ["tech_0013_co2-capture-in-the-bayer-process", "tech_0014_primary-smelting-with-integrated-co2-cap", "tech_0021_calcium-looping-carbon-capture", "tech_0022_chemical-absorption-full-capture-rates", "tech_0023_chemical-absorption-partial-capture-rate", "tech_0024_cryogenic-carbon-capture", "tech_0025_direct-separation-carbon-capture", "tech_0026_membrane-separation-carbon-capture", "tech_0027_novel-physical-adsorption-carbon-capture", "tech_0028_oxy-fuelling-and-carbon-capture", "tech_0106_conversion-of-steel-offgases-to-chemical", "tech_0107_carbon-recycling-through-thermochemical-", "tech_0108_chemical-absorption-carbon-capture-and-p", "tech_0109_conversion-of-steel-offgases-to-ethanol-", "tech_0110_smelting-with-integrated-co2-capture", "tech_0059_high-value-chemicals-production-using-ch", "tech_0075_methanol-production-with-co2-capture-hig", "tech_0101_dri-production-based-on-chemical-absorpt", "tech_0104_dri-production-based-on-physical-adsorpt", "tech_0053_haber-bosch-process-using-hydrogen-produ", "tech_0054_haber-bosch-process-using-hydrogen-produ", "tech_0518_coal-gasification-high-capture-rates", "tech_0520_steam-reforming-high-capture-rates", "tech_0521_steam-reforming-partial-capture", "tech_0524_electrified-steam-reforming", "tech_0525_sorption-enhanced-steam-reforming", "tech_0333_post-combustion-chemical-absorption-coal", "tech_0334_post-combustion-membranes-polymeric-coal", "tech_0335_post-combustion-solid-adsorption-coal-wi", "tech_0336_pre-combustion-physical-absorption-coal-", "tech_0337_supercritical-co2-cycle-coal-with-ccus", "tech_0342_post-combustion-chemical-absorption-natu", "tech_0343_supercritical-co2-cycle-natural-gas-with", "tech_0399_post-combustion-chemical-absorption-biom", "tech_0400_post-combustion-solid-adsorption-biomass", "tech_0401_pre-combustion-physical-absorption-bioma", "tech_0516_biomass-waste-gasification-with-ccus", "tech_0526_partial-oxidation-with-ccus", "tech_0032_carbonation-of-calcium-silicates", "tech_0599_co2-sequestration-in-inert-carbonate-mat", "tech_0500_co-firing-of-ammonia-in-coal-power-plant", "tech_0501_co-firing-of-ammonia-in-gas-turbines", "tech_0481_ammonia-cracking-reformer", "tech_0482_ammonia-cracking-catalytic-membrane"] },
+  "C100": { zh: "低碳燃燒與碳循環", en: "Low-Carbon Combustion & Carbon Cycling", techIds: ["tech_0013_co2-capture-in-the-bayer-process", "tech_0014_primary-smelting-with-integrated-co2-cap", "tech_0021_calcium-looping-carbon-capture", "tech_0022_chemical-absorption-full-capture-rates", "tech_0023_chemical-absorption-partial-capture-rate", "tech_0024_cryogenic-carbon-capture", "tech_0025_direct-separation-carbon-capture", "tech_0026_membrane-separation-carbon-capture", "tech_0027_novel-physical-adsorption-carbon-capture", "tech_0028_oxy-fuelling-and-carbon-capture", "tech_0106_conversion-of-steel-offgases-to-chemical", "tech_0107_carbon-recycling-through-thermochemical-", "tech_0108_chemical-absorption-carbon-capture-and-p", "tech_0109_conversion-of-steel-offgases-to-ethanol-", "tech_0110_smelting-with-integrated-co2-capture", "tech_0059_high-value-chemicals-production-using-ch", "tech_0075_methanol-production-with-co2-capture-hig", "tech_0101_dri-production-based-on-chemical-absorpt", "tech_0104_dri-production-based-on-physical-adsorpt", "tech_0053_haber-bosch-process-using-hydrogen-produ", "tech_0054_haber-bosch-process-using-hydrogen-produ", "tech_0518_coal-gasification-high-capture-rates", "tech_0520_steam-reforming-high-capture-rates", "tech_0521_steam-reforming-partial-capture", "tech_0524_electrified-steam-reforming", "tech_0525_sorption-enhanced-steam-reforming", "tech_0333_post-combustion-chemical-absorption-coal", "tech_0334_post-combustion-membranes-polymeric-coal", "tech_0335_post-combustion-solid-adsorption-coal-wi", "tech_0336_pre-combustion-physical-absorption-coal-", "tech_0337_supercritical-co2-cycle-coal-with-ccus", "tech_0342_post-combustion-chemical-absorption-natu", "tech_0343_supercritical-co2-cycle-natural-gas-with", "tech_0643_bioenergy-with-post-combustion-co2-captu", "tech_0644_bioenergy-with-pre-combustion-co2-captur", "tech_0516_biomass-waste-gasification-with-ccus", "tech_0526_partial-oxidation-with-ccus", "tech_0032_carbonation-of-calcium-silicates", "tech_0599_co2-sequestration-in-inert-carbonate-mat", "tech_0500_co-firing-of-ammonia-in-coal-power-plant", "tech_0501_co-firing-of-ammonia-in-gas-turbines", "tech_0481_ammonia-cracking-reformer", "tech_0482_ammonia-cracking-catalytic-membrane"] },
   "C200": { zh: "電池儲能系統", en: "Battery Energy Storage Systems", techIds: ["tech_0547_zinc-manganese-oxide-storage-battery", "tech_0548_lithium-ion-storage-battery", "tech_0549_metal-air-storage-battery", "tech_0550_redox-flow-storage-battery", "tech_0551_sodium-ion-storage-battery", "tech_0620_automatic-battery-recycling", "tech_0621_ev-battery-reuse-in-bess", "tech_0622_battery-passport", "tech_0623_battery-direct-recycling", "tech_0624_hydrometallurgical-battery-recycling", "tech_0625_use-of-a-pyro-hydro-metallurgy-combo-for", "tech_0626_pyrometallurgical-smelting-for-battery-r"] },
-  "C300": { zh: "生質能應用", en: "Bioenergy Applications", techIds: ["tech_0372_alcohol-to-jet-biokerosene", "tech_0373_transesterification-of-oil-fats-to-fatty", "tech_0374_gasification-and-fischer-tropsch-integra", "tech_0375_gasification-and-fischer-tropsch-without", "tech_0376_gasification-and-fischer-tropsch-with-hy", "tech_0377_hydrotreating-of-oil-fats-to-hydrogenate", "tech_0378_hydrothermal-liquefaction-and-upgrading-", "tech_0379_hydrothermal-liquefaction-and-upgrading-", "tech_0380_hydrotreating-of-micro-algae-biodiesel-b", "tech_0381_pyrolysis-and-upgrading-biodiesel", "tech_0382_synthetic-iso-paraffins", "tech_0383_transesterification-of-micro-algae-to-fa", "tech_0384_hydrothermal-liquefaction-and-upgrading-", "tech_0385_enzymatic-fermentation-of-lignocellulosi", "tech_0386_enzymatic-fermentation-of-sugar-or-starc", "tech_0387_enzymatic-fermentation-of-lignocellulosi", "tech_0388_enzymatic-fermentation-of-sugar-or-starc", "tech_0389_syngas-fermentation-bioethanol", "tech_0390_anaerobic-digestion-without-biogas-upgra", "tech_0391_anaerobic-digestion-and-biological-metha", "tech_0392_anaerobic-digestion-and-catalytic-methan", "tech_0393_anaerobic-digestion-and-upgrading-with-c", "tech_0394_anaerobic-digestion-and-upgrading-withou", "tech_0395_biomass-gasification-small-scale-bio-syn", "tech_0396_biomass-gasification-and-biological-meth", "tech_0397_biomass-gasification-and-catalytic-metha", "tech_0398_biomass-gasification-and-methanation-int", "tech_0399_post-combustion-chemical-absorption-biom", "tech_0400_post-combustion-solid-adsorption-biomass", "tech_0401_pre-combustion-physical-absorption-bioma", "tech_0065_recycling-via-chemical-depolymerisation-", "tech_0066_recycling-via-chemical-depolymerisation-", "tech_0068_pyrolysis-recycling", "tech_0064_recycling-via-solvent-dissolution-for-pp", "tech_0069_recycling-via-solvent-dissolution-for-pe", "tech_0071_methanol-production-using-biomass-and-wa", "tech_0135_black-liquor-gasification-and-valorisati", "tech_0138_pyrolysis-of-by-product-streams", "tech_0530_biomass-waste-pyrolysis"] },
+  "C300": { zh: "生質能應用", en: "Bioenergy Applications", techIds: ["tech_0647_ethanol-butanol-to-jet", "tech_0655_transesterification-of-oils-and-fats", "tech_0649_gasification-and-fischer-tropsch-with-cc", "tech_0648_gasification-and-fischer-tropsch", "tech_0376_gasification-and-fischer-tropsch-with-hy", "tech_0377_hydrotreating-of-oil-fats-to-hydrogenate", "tech_0378_hydrothermal-liquefaction-and-upgrading-", "tech_0646_biomass-pyrolysis", "tech_0650_hydroprocessing-of-fermented-sugars-hfs-", "tech_0652_lignocellulosic-biomass-fermentation-wit", "tech_0654_sugar-starch-fermentation-with-co2-captu", "tech_0651_lignocellulosic-biomass-fermentation", "tech_0653_sugar-starch-fermentation", "tech_0389_syngas-fermentation-bioethanol", "tech_0390_anaerobic-digestion-without-biogas-upgra", "tech_0641_anaerobic-digestion-with-biological-meth", "tech_0642_anaerobic-digestion-with-chemical-methan", "tech_0639_anaerobic-digestion-and-upgrading-with-c", "tech_0640_anaerobic-digestion-and-upgrading-with-c", "tech_0395_biomass-gasification-small-scale-bio-syn", "tech_0396_biomass-gasification-and-biological-meth", "tech_0397_biomass-gasification-and-catalytic-metha", "tech_0645_biomass-gasification-and-methanation-wit", "tech_0643_bioenergy-with-post-combustion-co2-captu", "tech_0644_bioenergy-with-pre-combustion-co2-captur", "tech_0065_recycling-via-chemical-depolymerisation-", "tech_0066_recycling-via-chemical-depolymerisation-", "tech_0068_pyrolysis-recycling", "tech_0064_recycling-via-solvent-dissolution-for-pp", "tech_0069_recycling-via-solvent-dissolution-for-pe", "tech_0071_methanol-production-using-biomass-and-wa", "tech_0135_black-liquor-gasification-and-valorisati", "tech_0138_pyrolysis-of-by-product-streams", "tech_0530_biomass-waste-pyrolysis"] },
   "C400": { zh: "氫氨能應用", en: "Hydrogen & Ammonia Applications", techIds: ["tech_0503_alkaline-electrolyser", "tech_0504_anion-exchange-membrane-electrolyser", "tech_0505_polymer-electrolyte-membrane-electrolyse", "tech_0506_solid-oxide-electrolyser-cell", "tech_0494_h2-blending-in-natural-gas-turbine", "tech_0495_molten-carbonates-fuel-cell", "tech_0496_pure-h2-gas-turbine", "tech_0497_solid-oxide-fuel-cell", "tech_0498_hybrid-hydrogen-fuel-cell-gas-turbine-sy", "tech_0224_fuel-cell-micro-chp-for-buildings"] },
   "D200": { zh: "先進電源系統研究室", en: "Advanced Power Systems Lab", techIds: ["tech_0156_fibre-optic-daylighting", "tech_0157_lighting-control-system", "tech_0158_conventional-led", "tech_0159_direct-current-lighting", "tech_0160_organic-led"] },
   "D300": { zh: "熱能系統研究室", en: "Thermal Energy Systems Lab", techIds: ["tech_0414_organic-rankine-cycle-low-temperature-re", "tech_0317_ship-engine-waste-heat-recovery"] },
@@ -125,17 +125,17 @@ const ITRI_SUBGROUP_TECH_MAP = {
 // misrepresent it rather than help navigation.
 const ITRI_SUBGROUP_CATEGORY_MAP = {
   "D100": { zh: "能源效率推動研究室", en: "Energy Efficiency Promotion Lab", categories: ["Buildings|Operations and equipment"] },
-  "G100": { zh: "能源與淨零策略研究室", en: "Energy & Net-Zero Strategy Lab", categories: ["Renewables", "Hydrogen", "Carbon Capture and Storage", "Nuclear", "Energy networks and storage", "Industry", "Transport", "Buildings"] },
-  "G200": { zh: "能源環社整合規劃研究室", en: "Energy-Society Integration Planning Lab", categories: ["Renewables|Solar", "Renewables|Hydropower", "Energy networks and storage|Smart grids"] },
-  "G300": { zh: "產業節能服務室", en: "Industrial Energy Efficiency Service Office", categories: ["Industry", "Carbon Capture and Storage", "Energy networks and storage|Smart grids"] },
+  "G100": { zh: "能源與淨零策略研究室", en: "Energy & Net-Zero Strategy Lab", categories: ["Renewables", "Hydrogen", "Carbon capture and storage", "Nuclear", "Energy networks and storage", "Industry", "Transport", "Buildings"] },
+  "G200": { zh: "能源環社整合規劃研究室", en: "Energy-Society Integration Planning Lab", categories: ["Renewables|Solar", "Renewables|Hydropower", "Energy networks and storage|Power grids"] },
+  "G300": { zh: "產業節能服務室", en: "Industrial Energy Efficiency Service Office", categories: ["Industry", "Carbon capture and storage", "Energy networks and storage|Power grids"] },
   "G400": { zh: "住商節能推動室", en: "Residential & Commercial Energy Efficiency Promotion Office", categories: ["Buildings|Operations and equipment", "Buildings|Design and envelope", "Buildings|Cooking technologies"] },
   "G500": { zh: "淨零韌性治理研究室", en: "Net-Zero Resilience Governance Lab", categories: ["Renewables", "Critical minerals", "Energy networks and storage"] },
   "J200": { zh: "智慧控制設備研究室", en: "Smart Control Equipment Lab", categories: ["Buildings|Operations and equipment"] },
-  "P100": { zh: "環境管理研究室", en: "Environmental Management Lab", categories: ["Industry", "Carbon Capture and Storage"] },
-  "P200": { zh: "微污染分析研究室", en: "Micro-Pollutant Analysis Lab", categories: ["Carbon Capture and Storage", "Transport|Road transport"] },
+  "P100": { zh: "環境管理研究室", en: "Environmental Management Lab", categories: ["Industry", "Carbon capture and storage"] },
+  "P200": { zh: "微污染分析研究室", en: "Micro-Pollutant Analysis Lab", categories: ["Carbon capture and storage", "Transport|Road transport"] },
   "P300": { zh: "資源循環技術研究室", en: "Resource Circulation Technology Lab", categories: ["Critical minerals|E-waste recycling"] },
   "R300": { zh: "太陽光電系統與可靠度研究室", en: "Solar PV Systems & Reliability Lab", categories: ["Renewables|Solar"] },
-  "U400": { zh: "防爆與電性安全研究室", en: "Explosion-Proof & Electrical Safety Lab", categories: ["Energy networks and storage|Physical grids"] },
+  "U400": { zh: "防爆與電性安全研究室", en: "Explosion-Proof & Electrical Safety Lab", categories: ["Energy networks and storage|Power grids"] },
   "U600": { zh: "電力監管推動研究室", en: "Electricity Market Regulation Promotion Office", categories: ["Energy networks and storage"] },
   "V100": { zh: "再生能源專案室", en: "Renewable Energy Project Office", categories: ["Renewables"] },
   "V200": { zh: "風力發電推動室", en: "Wind Power Promotion Office", categories: ["Renewables|Wind", "Energy networks and storage"] },
@@ -265,7 +265,16 @@ const SECTOR_TRANSLATIONS = {
   "Propulsion": "推進系統",
   "Subsurface operations for geothermal energy": "地熱能地下作業",
   "digital and tools": "數位技術與工具", "large-scale or industrial": "大型或工業規模技術",
-  "mass-manufactured": "量產型技術"
+  "mass-manufactured": "量產型技術",
+  // Category names introduced by IEA's 2026-10 guide data (old names above kept
+  // for older cached data).
+  "Chemicals": "化學品", "Power grids": "電網", "Oil and gas": "石油與天然氣",
+  "Carbon capture and storage": "碳捕捉與封存", "Carbon management": "碳管理",
+  "Thermochemical conversion": "熱化學轉換", "Fermentation": "發酵",
+  "District level thermal networks and storage": "區域熱網與熱能儲存",
+  "Anaerobic digestion": "厭氧消化", "Gasification to gaseous fuels": "氣化製氣態燃料",
+  "Gasification to liquid fuels": "氣化製液態燃料", "Refining": "煉製",
+  "Chemical upgrading & synthesis": "化學升級與合成", "Post-combustion capture": "燃燒後捕捉"
 };
 
 const SEARCH_ALIASES = {
@@ -465,7 +474,17 @@ const SECTOR_DEFINITIONS = {
   '航空營運': '航空器運航及地面移動的相關作業。',
   '其他車輛': '未歸入其他既有分類的車輛。',
   '水力發電': '利用水流能量產生電力。',
-  '熱製程': '主要利用熱能進行的工業製程。'
+  '熱製程': '主要利用熱能進行的工業製程。',
+  '厭氧消化': '在無氧條件下由微生物分解有機物，產生沼氣的生物程序。',
+  '發酵': '以微生物或酵素將糖類轉化為乙醇等燃料的程序。',
+  '氣化製氣態燃料': '將生質原料氣化後製成甲烷等氣態燃料。',
+  '氣化製液態燃料': '將生質原料氣化後合成柴油、航空燃油等液態燃料。',
+  '化學升級與合成': '以化學反應將生質中間產物轉化為可直接使用的燃料。',
+  '燃燒後捕捉': '從燃燒後的煙氣中分離並捕捉二氧化碳。',
+  '碳管理': '捕捉、減少或處理化石燃料相關二氧化碳排放的技術。',
+  '煉製': '將原油或中間產品加工為燃料及其他產品。',
+  '區域熱網與熱能儲存': '區域層級的熱能輸配管網及其搭配的熱能儲存系統。',
+  '推進系統': '產生動力或推力以驅動船舶的系統。'
 };
 
 // English-mode counterpart to SECTOR_DEFINITIONS above — keyed by the exact
@@ -610,6 +629,16 @@ const SECTOR_DEFINITIONS_EN = {
   'Methane emissions monitoring and abatement': 'Technologies that detect, measure and reduce methane emissions.',
   'Hydrogen-fuelled vehicules': 'Vehicles powered by hydrogen through fuel cells or combustion.',
   'Air-source heat pumps': 'Heat pumps that exchange heat with outdoor air.',
+  'Anaerobic digestion': 'A biological process in which microbes break down organic matter without oxygen to produce biogas.',
+  'Fermentation': 'Processes that use microbes or enzymes to convert sugars into fuels such as ethanol.',
+  'Gasification to gaseous fuels': 'Gasifying biomass to produce gaseous fuels such as methane.',
+  'Gasification to liquid fuels': 'Gasifying biomass to synthesise liquid fuels such as diesel and jet fuel.',
+  'Chemical upgrading & synthesis': 'Chemical conversion of bio-based intermediates into drop-in fuels.',
+  'Post-combustion capture': 'Separating and capturing CO2 from flue gas after combustion.',
+  'Carbon management': 'Technologies that capture, reduce or handle CO2 emissions from fossil fuels.',
+  'Refining': 'Processing crude oil or intermediates into fuels and other products.',
+  'District level thermal networks and storage': 'District-scale heat distribution networks and their thermal storage.',
+  'Propulsion': 'Systems that generate power or thrust to propel a vessel.',
 };
 
 // One-line definitions for intermediate breadcrumb keywords (path segments
@@ -688,6 +717,12 @@ const SECTOR_PATH_DEFINITIONS_ZH = {
   'Thermal processes': '主要利用熱能進行的工業製程。',
   'Fusion': '藉由輕原子核融合反應產生能量。',
   'Sythetic fuels production': '透過化學合成製造燃料。',
+  'Carbon capture and storage': '捕捉、運輸並永久封存二氧化碳的技術鏈。',
+  'Carbon management': '捕捉、減少或處理化石燃料相關二氧化碳排放的技術。',
+  'Chemicals': '化學品、高分子材料及塑膠產品的生產。',
+  'Oil and gas': '涵蓋石油與天然氣探勘、生產及處理的產業。',
+  'Power grids': '輸電、配電的實體設施，以及運用數位監測與控制管理電力的技術。',
+  'Thermochemical conversion': '以熱能將生質原料轉化為燃料的製程，例如氣化與熱裂解。',
 };
 
 const SECTOR_PATH_DEFINITIONS_EN = {
@@ -760,6 +795,12 @@ const SECTOR_PATH_DEFINITIONS_EN = {
   'Thermal processes': 'Industrial processes driven primarily by heat.',
   'Fusion': 'Energy production by combining light atomic nuclei.',
   'Sythetic fuels production': 'Production of fuels through chemical synthesis.',
+  'Carbon capture and storage': 'Capture, transport and permanent storage of carbon dioxide.',
+  'Carbon management': 'Technologies that capture, reduce or handle CO2 emissions from fossil fuels.',
+  'Chemicals': 'Production of chemicals, polymers and plastic products.',
+  'Oil and gas': 'The sector covering exploration, production and processing of oil and gas.',
+  'Power grids': 'Physical transmission and distribution infrastructure and digital grid management.',
+  'Thermochemical conversion': 'Processes that use heat to convert biomass into fuels, such as gasification and pyrolysis.',
 };
 
 // initiative.country in the cached dataset is only ever stored in English
@@ -1506,6 +1547,30 @@ const SUPPLY_CHAIN_ZH_MAP = {
   'Heat end use': '熱能終端使用',
   'CO2 transport': '二氧化碳運輸',
   'Flexibility (grids)': '電網彈性調度',
+  // Tags introduced by IEA's 2026-10 guide data.
+  'Electricity end use': '電力終端使用',
+  'Electricity storage': '電力儲存',
+  'Electricity transmission and distribution': '電力輸配',
+  'Electric (batteries)': '電動化（電池）',
+  'Electric (vehicles)': '電動化（車輛）',
+  'Mineral mining and extraction': '礦物採掘',
+  'Hydrogen': '氫能',
+  'Hydrogen production': '氫氣生產',
+  'Hydrogen storage': '氫氣儲存',
+  'Hydrogen distribution': '氫氣輸配',
+  'Hydrogen direct use': '氫氣直接利用',
+  'Hydrogen-based fuels production': '氫基燃料生產',
+  'Hydrogen-based fuels storage': '氫基燃料儲存',
+  'Hydrogen-based fuels use': '氫基燃料利用',
+  'Ammonia': '氨',
+  'Synthetic fuels': '合成燃料',
+  'Methanol and ethanol': '甲醇與乙醇',
+  'Bio-based fuels': '生質燃料',
+  'Biofuels use': '生質燃料利用',
+  'Biogases production': '沼氣生產',
+  'Biomass use': '生質原料利用',
+  'Liquid biofuels production': '液態生質燃料生產',
+  'Other': '其他',
 };
 
 // Case-notes country translation for zh-mode CSV export only — the initiative
@@ -1591,6 +1656,9 @@ const COUNTRY_ZH_MAP = {
   'Nauru': '諾魯',
   'Burkina Faso': '布吉納法索',
   'Argentina-Uruguay': '阿根廷、烏拉圭',
+  'Bangladesh': '孟加拉', 'Botswana': '波札那', 'DRC Congo': '剛果民主共和國',
+  'Hungary': '匈牙利', 'Saudia Arabia': '沙烏地阿拉伯', 'Singepore': '新加坡',
+  'Southern Africa': '南部非洲', 'Türkiye': '土耳其',
 };
 
 function translateCountryZh(raw) {
