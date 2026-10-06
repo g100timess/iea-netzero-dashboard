@@ -3823,6 +3823,10 @@ function SkeletonMain() {
 // inconsistently across browsers on its empty interior. onLockChange (if
 // given) fires with the locked segment or null, so the parent card can
 // show a summary underneath while a segment is locked.
+// Below md each feature is its own glass card; from md up they flatten into
+// divided rows inside one shared white box (the {accent} slot only matters on mobile).
+const DESKTOP_FEATURE_ROW_CLASS = 'bg-white/50 md:bg-transparent p-6 md:p-0 md:py-6 rounded-2xl md:rounded-none backdrop-blur-md md:backdrop-blur-none shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-none border border-white/60 md:border-0 border-t-4 {accent} md:border-t md:border-t-slate-100 md:flex md:flex-wrap md:items-center md:gap-x-5 md:gap-y-4';
+
 function DonutChart({ segments, centerValue, centerLabel, size = 132, strokeWidth = 18, onLockChange }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [lockedIndex, setLockedIndex] = useState(null);
@@ -5448,8 +5452,8 @@ function Dashboard({
                 behavior — visible only under the 策略總覽 tab, at its
                 original fixed width beside the report/export/ppt cards. */}
             {totalMatches > 0 && (
-              <div className={`order-1 md:order-none p-4 md:p-0 lg:w-[340px] flex-shrink-0 ${rightPanelTab !== 'strategy' ? 'md:hidden' : ''}`}>
-                <div ref={sectorCardRef} className="bg-white/50 md:bg-white backdrop-blur-md md:backdrop-blur-none rounded-2xl shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200 border-t-4 border-t-blue-500 p-6 md:p-8 flex flex-col items-center">
+              <div className={`order-1 md:order-none p-4 md:p-0 md:pl-6 md:py-6 lg:w-[340px] md:box-content flex-shrink-0 md:flex md:flex-col ${rightPanelTab !== 'strategy' ? 'md:hidden' : ''}`}>
+                <div ref={sectorCardRef} className="bg-white/50 md:bg-white backdrop-blur-md md:backdrop-blur-none rounded-2xl shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200 border-t-4 border-t-blue-500 p-6 md:p-8 flex flex-col items-center md:flex-1 md:min-h-0 md:overflow-y-auto">
                   <h3 className="text-lg font-bold text-slate-800 mb-1 self-start">{L.sectorDistributionTitle}</h3>
                   <p className="text-xs text-slate-400 mb-5 self-start">
                     <span className="md:hidden">{L.mobileSectorDesc}</span>
@@ -5458,37 +5462,52 @@ function Dashboard({
                   {isCheckedSubsetActive && (
                     <p className="text-sm text-purple-600 bg-purple-50 border border-purple-100 rounded px-2 py-1 mb-4 self-start">{L.checkedSubsetBadge(strategyCount)}</p>
                   )}
-                  <DonutChart
-                    key={pathFilter ? pathFilter.join('>') : 'root'}
-                    segments={sectorDonutData}
-                    centerValue={strategyCount}
-                    centerLabel={L.sectorDistributionCenterLabel}
-                    size={208}
-                    strokeWidth={22}
-                    onLockChange={handleDonutSegmentClick}
-                  />
-                  {(canFilterNavBack || canFilterNavForward) && (
-                    <div className="flex items-center gap-2 mt-5">
-                      {canFilterNavBack && (
-                        <button
-                          onClick={onFilterNavBack}
-                          title={L.backOneLevel}
-                          className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          <ChevronLeft size={14} /> {L.backOneLevel}
-                        </button>
-                      )}
-                      {canFilterNavForward && (
-                        <button
-                          onClick={onFilterNavForward}
-                          title={L.forwardOneLevel}
-                          className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          {L.forwardOneLevel} <ChevronRight size={14} />
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex flex-col items-center md:flex-1 md:justify-center md:w-full md:py-4">
+                    <DonutChart
+                      key={pathFilter ? pathFilter.join('>') : 'root'}
+                      segments={sectorDonutData}
+                      centerValue={strategyCount}
+                      centerLabel={L.sectorDistributionCenterLabel}
+                      size={208}
+                      strokeWidth={22}
+                      onLockChange={handleDonutSegmentClick}
+                    />
+                    {(canFilterNavBack || canFilterNavForward) && (
+                      <div className="flex items-center gap-2 mt-5">
+                        {canFilterNavBack && (
+                          <button
+                            onClick={onFilterNavBack}
+                            title={L.backOneLevel}
+                            className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            <ChevronLeft size={14} /> {L.backOneLevel}
+                          </button>
+                        )}
+                        {canFilterNavForward && (
+                          <button
+                            onClick={onFilterNavForward}
+                            title={L.forwardOneLevel}
+                            className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            {L.forwardOneLevel} <ChevronRight size={14} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {/* Desktop-only legend: fills the (now full-height) card and
+                        names every slice, since the donut itself only shows
+                        a label on hover. */}
+                    <ul className="hidden md:block w-full mt-7 space-y-2">
+                      {sectorDonutData.map(seg => (
+                        <li key={seg.label} className="flex items-center gap-2.5 text-sm text-slate-600">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }} />
+                          <span className="flex-1 min-w-0 truncate" title={seg.label}>{seg.label}</span>
+                          <span className="font-semibold text-slate-700 tabular-nums">{seg.value}</span>
+                          <span className="w-11 text-right text-xs text-slate-400 tabular-nums">{Math.round((seg.value / (strategyCount || 1)) * 100)}%</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                   {lockedSectorSummary && (
                     <p className="text-base text-slate-600 leading-relaxed mt-5 pt-4 border-t border-slate-100 self-stretch">
                       {lockedSectorSummary}
@@ -5498,9 +5517,10 @@ function Dashboard({
               </div>
             )}
 
-            <div className={`order-3 md:order-none flex flex-col md:overflow-y-auto p-4 md:p-8 w-full ${rightPanelTab !== 'strategy' ? 'md:hidden' : ''}`}>
-                <div className="max-w-6xl mx-auto w-full">
-                  <div className="mb-6">
+            <div className={`order-3 md:order-none flex flex-col md:overflow-y-auto p-4 md:p-6 w-full ${rightPanelTab !== 'strategy' ? 'md:hidden' : ''}`}>
+                <div className="max-w-6xl mx-auto w-full md:flex-1 md:flex md:flex-col">
+                  <div className="md:flex-1 md:bg-white md:rounded-2xl md:border md:border-slate-200 md:border-t-4 md:border-t-purple-500 md:shadow-sm md:p-8">
+                  <div className="mb-6 md:mb-5">
                     <h2 className="text-xl font-bold text-slate-800">{L.strategyTitle}</h2>
                     <p className="text-base text-slate-500 mt-1">
                       <span className="md:hidden">{L.mobileStrategyDesc}</span>
@@ -5509,13 +5529,13 @@ function Dashboard({
                   </div>
 
                   <div className="flex flex-col lg:flex-row gap-6 items-stretch">
-                    <div className="flex-1 space-y-6 min-w-0">
+                    <div className="flex-1 space-y-6 md:space-y-0 min-w-0">
                       {/* Strategy overview card — opens instantly with a rule-based
                           summary; the option to upgrade to an AI-generated version
                           lives inside that same modal, so this is one progressive
                           entry point rather than two separate, overlapping ones. */}
-                      <div ref={strategyCardRef} className="bg-white/50 md:bg-white p-6 md:p-8 rounded-2xl backdrop-blur-md md:backdrop-blur-none shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200 border-t-4 border-t-purple-500">
-                        <div className="flex items-start gap-4 mb-5">
+                      <div ref={strategyCardRef} className={DESKTOP_FEATURE_ROW_CLASS.replace('{accent}', 'border-t-purple-500')}>
+                        <div className="flex items-start gap-4 mb-5 md:mb-0 md:flex-1 md:min-w-[300px]">
                           <div className="bg-gradient-to-br from-purple-500 to-blue-500 text-white rounded-xl p-3 flex-shrink-0">
                             <Sparkles size={22} />
                           </div>
@@ -5566,7 +5586,7 @@ function Dashboard({
                         <button
                           onClick={() => onOpenStrategyOverview({ results: strategyResults, totalMatches: strategyCount })}
                           disabled={strategyCount === 0}
-                          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-all"
+                          className="w-full sm:w-auto md:flex-shrink-0 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-all"
                         >
                           <Sparkles size={18} /> {L.openStrategyBtn}
                         </button>
@@ -5578,8 +5598,8 @@ function Dashboard({
                           serve different intents (raw data vs. an external
                           slide-generation workflow), so they're now split
                           into separate cards. */}
-                      <div ref={exportCardRef} className="bg-white/50 md:bg-white p-6 md:p-8 rounded-2xl backdrop-blur-md md:backdrop-blur-none shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200 border-t-4 border-t-emerald-500">
-                        <div className="flex items-start gap-4 mb-5">
+                      <div ref={exportCardRef} className={DESKTOP_FEATURE_ROW_CLASS.replace('{accent}', 'border-t-emerald-500')}>
+                        <div className="flex items-start gap-4 mb-5 md:mb-0 md:flex-1 md:min-w-[300px]">
                           <div className="bg-emerald-50 text-emerald-600 rounded-xl p-3 flex-shrink-0">
                             <Download size={22} />
                           </div>
@@ -5593,7 +5613,7 @@ function Dashboard({
                         <button
                           onClick={handleExportListCsv}
                           disabled={strategyCount === 0}
-                          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
+                          className="w-full sm:w-auto md:flex-shrink-0 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-colors"
                         >
                           <Download size={18} /> {L.exportAll}
                         </button>
@@ -5608,8 +5628,8 @@ function Dashboard({
                           and the three raw actions it walks through sit
                           below as lightweight secondary buttons for anyone
                           who already knows the flow. */}
-                      <div ref={pptCardRef} className="bg-white/50 md:bg-white p-6 md:p-8 rounded-2xl backdrop-blur-md md:backdrop-blur-none shadow-[0_8px_24px_-12px_rgba(19,60,110,0.35)] md:shadow-sm border border-white/60 md:border-slate-200 border-t-4 border-t-blue-500">
-                        <div className="flex items-start gap-4 mb-5">
+                      <div ref={pptCardRef} className={DESKTOP_FEATURE_ROW_CLASS.replace('{accent}', 'border-t-blue-500') + ' md:last:pb-0'}>
+                        <div className="flex items-start gap-4 mb-5 md:mb-0 md:flex-1 md:min-w-[300px]">
                           <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-xl p-3 flex-shrink-0">
                             <Presentation size={22} />
                           </div>
@@ -5623,12 +5643,12 @@ function Dashboard({
 
                         <button
                           onClick={() => setShowPptGuide(true)}
-                          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-all"
+                          className="w-full sm:w-auto md:flex-shrink-0 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-sm rounded-lg px-6 py-3 text-base font-semibold transition-all"
                         >
                           <HelpCircle size={18} /> {L.openPptGuide}
                         </button>
 
-                        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-2">
+                        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-2 md:basis-full md:mt-0 md:pt-4">
                           <button
                             onClick={handleCopyListArticle}
                             disabled={strategyCount === 0}
@@ -5655,10 +5675,11 @@ function Dashboard({
                       </div>
                     </div>
                   </div>
+                  </div>
 
                   {/* Disclaimer — moved here from a dark footer bar so it
                       blends into the page bottom as muted gray text. */}
-                  <p className="text-xs text-slate-400 text-center leading-relaxed mt-8">{L.footerDisclaimer}</p>
+                  <p className="text-xs text-slate-400 text-center leading-relaxed mt-8 md:mt-4">{L.footerDisclaimer}</p>
                 </div>
               </div>
           </div>
